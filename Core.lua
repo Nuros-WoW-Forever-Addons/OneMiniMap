@@ -13,7 +13,7 @@ _G.OneMiniMap = _G.OneMiniMap or addonTable
 local OneMiniMap = _G.OneMiniMap
 
 OneMiniMap.name = addonName or "OneMiniMap"
-OneMiniMap.version = "0.2.1"
+OneMiniMap.version = "0.2.2"
 OneMiniMap.isInitialized = false
 
 -- Default Database Configuration
@@ -123,7 +123,7 @@ local function SetupSquareMask()
 end
 
 -------------------------------------------------------------------------------
--- Complete Suppression of Native Blizzard Chrome & Stray Clusters
+-- Complete Suppression of Native Blizzard Chrome, MinimapBackdrop & Clusters
 -------------------------------------------------------------------------------
 local hiddenFrame = CreateFrame("Frame")
 hiddenFrame:Hide()
@@ -147,23 +147,47 @@ local function KillObject(obj)
 end
 
 local function SuppressBlizzardChrome()
-    -- 1. Neutralize known Blizzard minimap chrome frames by reparenting to hidden dummy
+    -- Known Blizzard Minimap frames and textures (covering all capitalizations & client generations)
     local framesToHide = {
+        "MinimapBackdrop",
+        "MiniMapBackdrop",
         "MinimapBorder",
+        "MiniMapBorder",
         "MinimapBorderTop",
+        "MiniMapBorderTop",
         "MinimapZoneTextButton",
+        "MiniMapZoneTextButton",
         "MinimapToggleButton",
+        "MiniMapToggleButton",
         "MinimapZoomIn",
+        "MiniMapZoomIn",
         "MinimapZoomOut",
+        "MiniMapZoomOut",
         "MiniMapWorldMapButton",
         "TimeManagerClockButton",
+        "MinimapNorthTag",
+        "MinimapCompassTexture",
     }
 
     for _, frameName in ipairs(framesToHide) do
         KillObject(_G[frameName])
     end
 
-    -- 2. Strip all textures and stray FontStrings from MinimapCluster
+    -- Neutralize MinimapBackdrop if present (contains the native circular artwork)
+    local mb = _G["MinimapBackdrop"] or _G["MiniMapBackdrop"]
+    if mb then
+        pcall(function()
+            KillObject(mb)
+            for _, r in ipairs({ mb:GetRegions() }) do
+                KillObject(r)
+            end
+            for _, c in ipairs({ mb:GetChildren() }) do
+                KillObject(c)
+            end
+        end)
+    end
+
+    -- Neutralize MinimapCluster regions & non-essential children
     if MinimapCluster then
         pcall(function()
             for _, region in ipairs({ MinimapCluster:GetRegions() }) do
@@ -181,13 +205,26 @@ local function SuppressBlizzardChrome()
         end)
     end
 
-    -- 3. Strip any circular border textures directly attached to Minimap
+    -- Strip any decorative/border textures directly attached to Minimap itself
     pcall(function()
         for _, region in ipairs({ Minimap:GetRegions() }) do
             if region:IsObjectType("Texture") then
                 local tex = region:GetTexture()
-                if tex and type(tex) == "string" and (tex:find("Border") or tex:find("Corner") or tex:find("UI%-Minimap")) then
-                    KillObject(region)
+                if tex then
+                    local str = tostring(tex):lower()
+                    if str:find("border") or str:find("corner") or str:find("round") or str:find("circle") or str:find("ui%-minimap") or str:find("compass") then
+                        KillObject(region)
+                    end
+                end
+            end
+        end
+
+        for _, child in ipairs({ Minimap:GetChildren() }) do
+            local cname = child:GetName() or ""
+            if not cname:find("OneMiniMap") then
+                local lname = cname:lower()
+                if lname:find("border") or lname:find("backdrop") or lname:find("zoom") or lname:find("compass") or lname:find("tag") then
+                    KillObject(child)
                 end
             end
         end
@@ -283,7 +320,7 @@ function OneMiniMap:CreateMapFrame()
 
     local backdropTemplate = BackdropTemplateMixin and "BackdropTemplate" or nil
     local frame = CreateFrame("Frame", "OneMiniMapFrame", UIParent, backdropTemplate)
-    frame:SetSize(148, 148)
+    frame:SetSize(152, 152)
     frame:SetClampedToScreen(true)
     frame:SetMovable(true)
     frame:SetFrameStrata("LOW")
@@ -302,14 +339,14 @@ function OneMiniMap:CreateMapFrame()
     -- Reparent Minimap securely inside container
     Minimap:SetParent(frame)
     Minimap:ClearAllPoints()
-    Minimap:SetPoint("TOPLEFT", frame, "TOPLEFT", 4, -4)
-    Minimap:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -4, 4)
+    Minimap:SetPoint("TOPLEFT", frame, "TOPLEFT", 6, -6)
+    Minimap:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -6, 6)
     Minimap:SetSize(140, 140)
 
-    -- Elevated Border Overlay (FrameLevel + 5) so the signature OnePanel silver metal border sits cleanly over the map edges
+    -- Elevated Border Overlay (FrameLevel + 10) matching OnePanel silver dialog border
     local borderOverlay = CreateFrame("Frame", nil, frame, backdropTemplate)
     borderOverlay:SetAllPoints(frame)
-    borderOverlay:SetFrameLevel(frame:GetFrameLevel() + 5)
+    borderOverlay:SetFrameLevel(frame:GetFrameLevel() + 10)
     borderOverlay:EnableMouse(false)
 
     ApplyBackdrop(borderOverlay, {
@@ -378,7 +415,7 @@ function OneMiniMap:CreateTitleFrame()
     if self.titleFrame then return self.titleFrame end
 
     local frame = CreateFrame("Button", "OneMiniMapTitleFrame", UIParent)
-    frame:SetSize(148, 20)
+    frame:SetSize(152, 20)
     frame:SetClampedToScreen(true)
     frame:SetMovable(true)
     frame:SetFrameStrata("LOW")
@@ -454,7 +491,7 @@ function OneMiniMap:CreateClockFrame()
     if self.clockFrame then return self.clockFrame end
 
     local frame = CreateFrame("Button", "OneMiniMapClockFrame", UIParent)
-    frame:SetSize(68, 20)
+    frame:SetSize(70, 20)
     frame:SetClampedToScreen(true)
     frame:SetMovable(true)
     frame:SetFrameStrata("LOW")
@@ -518,7 +555,7 @@ function OneMiniMap:CreateCoordFrame()
     if self.coordFrame then return self.coordFrame end
 
     local frame = CreateFrame("Button", "OneMiniMapCoordFrame", UIParent)
-    frame:SetSize(76, 20)
+    frame:SetSize(78, 20)
     frame:SetClampedToScreen(true)
     frame:SetMovable(true)
     frame:SetFrameStrata("LOW")
@@ -668,7 +705,7 @@ function OneMiniMap:RestorePositions()
         end
     end
 
-    -- 1. Map Frame: Default TOPRIGHT of screen (-25, -50) giving room for title bar
+    -- 1. Map Frame: Default TOPRIGHT of screen (-25, -50)
     Restore(self.mapFrame, OneMiniMapDB.mapPosition, function(f)
         f:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -25, -50)
     end)
@@ -687,6 +724,32 @@ function OneMiniMap:RestorePositions()
     Restore(self.coordFrame, OneMiniMapDB.coordPosition, function(f)
         f:SetPoint("TOPRIGHT", self.mapFrame, "BOTTOMRIGHT", 0, -4)
     end)
+end
+
+-------------------------------------------------------------------------------
+-- Diagnostic Inspector (/omm dump)
+-------------------------------------------------------------------------------
+function OneMiniMap:DumpInspection()
+    DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap Inspector Dump:|r")
+    local function PrintInfo(prefix, frame)
+        if not frame then return end
+        DEFAULT_CHAT_FRAME:AddMessage(string.format("  [%s] Name: %s, Shown: %s", prefix, frame:GetName() or "Anon", tostring(frame:IsShown())))
+        if frame.GetRegions then
+            for i, r in ipairs({ frame:GetRegions() }) do
+                local tex = r.GetTexture and r:GetTexture()
+                DEFAULT_CHAT_FRAME:AddMessage(string.format("    Region %d (%s): Shown=%s, Tex=%s", i, r:GetObjectType() or "?", tostring(r:IsShown()), tostring(tex)))
+            end
+        end
+        if frame.GetChildren then
+            for i, c in ipairs({ frame:GetChildren() }) do
+                DEFAULT_CHAT_FRAME:AddMessage(string.format("    Child %d: Name=%s, Shown=%s", i, c:GetName() or "Anon", tostring(c:IsShown())))
+            end
+        end
+    end
+
+    PrintInfo("Minimap", Minimap)
+    PrintInfo("MinimapBackdrop", _G["MinimapBackdrop"])
+    PrintInfo("MinimapCluster", MinimapCluster)
 end
 
 -------------------------------------------------------------------------------
@@ -773,6 +836,8 @@ SlashCmdList["ONEMINIMAP"] = function(msg)
             OneMiniMap.titleFrame:SetShown(OneMiniMapDB.showTitle)
         end
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Title bar toggled " .. (OneMiniMapDB.showTitle and "|cff20ff20ON|r" or "|cffff2020OFF|r") .. ".")
+    elseif cmd == "dump" then
+        OneMiniMap:DumpInspection()
     elseif cmd == "reset" then
         OneMiniMapDB.mapPosition = nil
         OneMiniMapDB.titlePosition = nil
@@ -799,6 +864,7 @@ SlashCmdList["ONEMINIMAP"] = function(msg)
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm title|r - Toggle title bar frame")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm clock|r - Toggle clock frame")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm coords|r - Toggle coordinates frame")
+        DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm dump|r - Print diagnostic frame inspector details")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm scale <0.5 - 2.0>|r - Adjust scale")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm reset|r - Reset all frames to default positions")
     end
