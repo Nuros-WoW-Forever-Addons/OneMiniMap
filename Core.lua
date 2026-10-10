@@ -2,7 +2,7 @@
     OneMiniMap - Core.lua
     Modular Square MiniMap replacement with signature OneSuite metal frame styling,
     separate frameless translucent title bar, draggable clock frame,
-    and draggable coordinates frame.
+    draggable coordinates frame, and button collector integration.
     Compatibility: Vanilla 1.12, Turtle WoW 1.16, WotLK 3.3.5, and Modern WoW.
 --]]
 
@@ -13,7 +13,7 @@ _G.OneMiniMap = _G.OneMiniMap or addonTable
 local OneMiniMap = _G.OneMiniMap
 
 OneMiniMap.name = addonName or "OneMiniMap"
-OneMiniMap.version = "0.2.2"
+OneMiniMap.version = "0.3.0"
 OneMiniMap.isInitialized = false
 
 -- Default Database Configuration
@@ -23,11 +23,14 @@ local defaultDB = {
     showTitle = true,
     showClock = true,
     showCoords = true,
+    showButtons = true,
+    buttonCols = 1,
     scale = 1.0,
     mapPosition = nil,
     titlePosition = nil,
     clockPosition = nil,
     coordPosition = nil,
+    buttonCollectorPosition = nil,
 }
 
 -------------------------------------------------------------------------------
@@ -109,6 +112,55 @@ local function CreateTranslucentBackground(parent, alpha)
 end
 
 -------------------------------------------------------------------------------
+-- Direct Minimap Zoom Handling (Wheel & Clicks)
+-------------------------------------------------------------------------------
+local function DoZoom(delta)
+    if not Minimap or not Minimap.GetZoom then return end
+    local curr = Minimap:GetZoom()
+    local maxZoom = (Minimap.GetZoomLevels and Minimap:GetZoomLevels() - 1) or 5
+
+    if delta > 0 then
+        if curr < maxZoom then
+            Minimap:SetZoom(curr + 1)
+        end
+    elseif delta < 0 then
+        if curr > 0 then
+            Minimap:SetZoom(curr - 1)
+        end
+    end
+end
+
+local function SetupZoomHandling()
+    Minimap:EnableMouseWheel(true)
+    Minimap:SetScript("OnMouseWheel", function(self, delta)
+        DoZoom(delta)
+    end)
+
+    -- Hook native +/- buttons if they appear on mouseover
+    if MinimapZoomIn then
+        MinimapZoomIn:SetScript("OnClick", function() DoZoom(1) end)
+    end
+    if MinimapZoomOut then
+        MinimapZoomOut:SetScript("OnClick", function() DoZoom(-1) end)
+    end
+end
+
+-------------------------------------------------------------------------------
+-- Action Bar Paging Protection
+-------------------------------------------------------------------------------
+local function ProtectActionBars()
+    -- Disable mouse wheel paging on MainMenuBar to prevent accidental page flipping
+    if MainMenuBar and MainMenuBar.EnableMouseWheel then
+        MainMenuBar:EnableMouseWheel(false)
+    end
+
+    -- If the player's action bar was accidentally paged, reset it to page 1
+    if CURRENT_ACTIONBAR_PAGE and CURRENT_ACTIONBAR_PAGE ~= 1 and ChangeActionBarPage then
+        ChangeActionBarPage(1)
+    end
+end
+
+-------------------------------------------------------------------------------
 -- Square Mask & Shape Override
 -------------------------------------------------------------------------------
 local function SetupSquareMask()
@@ -147,7 +199,7 @@ local function KillObject(obj)
 end
 
 local function SuppressBlizzardChrome()
-    -- Known Blizzard Minimap frames and textures (covering all capitalizations & client generations)
+    -- Known Blizzard Minimap frames and textures (covering all capitalizations)
     local framesToHide = {
         "MinimapBackdrop",
         "MiniMapBackdrop",
@@ -159,10 +211,6 @@ local function SuppressBlizzardChrome()
         "MiniMapZoneTextButton",
         "MinimapToggleButton",
         "MiniMapToggleButton",
-        "MinimapZoomIn",
-        "MiniMapZoomIn",
-        "MinimapZoomOut",
-        "MiniMapZoomOut",
         "MiniMapWorldMapButton",
         "TimeManagerClockButton",
         "MinimapNorthTag",
@@ -173,26 +221,20 @@ local function SuppressBlizzardChrome()
         KillObject(_G[frameName])
     end
 
-    -- Neutralize MinimapBackdrop if present (contains the native circular artwork)
+    -- Neutralize MinimapBackdrop
     local mb = _G["MinimapBackdrop"] or _G["MiniMapBackdrop"]
     if mb then
         pcall(function()
             KillObject(mb)
-            for _, r in ipairs({ mb:GetRegions() }) do
-                KillObject(r)
-            end
-            for _, c in ipairs({ mb:GetChildren() }) do
-                KillObject(c)
-            end
+            for _, r in ipairs({ mb:GetRegions() }) do KillObject(r) end
+            for _, c in ipairs({ mb:GetChildren() }) do KillObject(c) end
         end)
     end
 
     -- Neutralize MinimapCluster regions & non-essential children
     if MinimapCluster then
         pcall(function()
-            for _, region in ipairs({ MinimapCluster:GetRegions() }) do
-                KillObject(region)
-            end
+            for _, region in ipairs({ MinimapCluster:GetRegions() }) do KillObject(region) end
             for _, child in ipairs({ MinimapCluster:GetChildren() }) do
                 if child ~= Minimap and child ~= MiniMapTrackingFrame and child ~= MiniMapMailFrame and child ~= GameTimeFrame then
                     KillObject(child)
@@ -205,7 +247,7 @@ local function SuppressBlizzardChrome()
         end)
     end
 
-    -- Strip any decorative/border textures directly attached to Minimap itself
+    -- Strip decorative/border textures directly attached to Minimap itself
     pcall(function()
         for _, region in ipairs({ Minimap:GetRegions() }) do
             if region:IsObjectType("Texture") then
@@ -221,95 +263,14 @@ local function SuppressBlizzardChrome()
 
         for _, child in ipairs({ Minimap:GetChildren() }) do
             local cname = child:GetName() or ""
-            if not cname:find("OneMiniMap") then
+            if not cname:find("^OneMiniMap") then
                 local lname = cname:lower()
-                if lname:find("border") or lname:find("backdrop") or lname:find("zoom") or lname:find("compass") or lname:find("tag") then
+                if lname:find("border") or lname:find("backdrop") or lname:find("compass") or lname:find("tag") then
                     KillObject(child)
                 end
             end
         end
     end)
-end
-
--------------------------------------------------------------------------------
--- Mouse Wheel Zooming
--------------------------------------------------------------------------------
-local function SetupMouseWheelZoom()
-    Minimap:EnableMouseWheel(true)
-    Minimap:SetScript("OnMouseWheel", function(self, delta)
-        if delta > 0 then
-            if Minimap_ZoomIn then
-                Minimap_ZoomIn()
-            else
-                local curr = self:GetZoom()
-                local maxZoom = (self.GetZoomLevels and self:GetZoomLevels() - 1) or 5
-                if curr < maxZoom then
-                    self:SetZoom(curr + 1)
-                end
-            end
-        else
-            if Minimap_ZoomOut then
-                Minimap_ZoomOut()
-            else
-                local curr = self:GetZoom()
-                if curr > 0 then
-                    self:SetZoom(curr - 1)
-                end
-            end
-        end
-    end)
-end
-
--------------------------------------------------------------------------------
--- Peripheral Minimap Buttons Docking
--------------------------------------------------------------------------------
-local function DockMinimapButtons()
-    local parent = OneMiniMap.mapFrame or Minimap
-
-    -- Tracking Icon (Binoculars / magnifying glass)
-    local tracking = _G["MiniMapTracking"] or _G["MiniMapTrackingFrame"]
-    if tracking then
-        tracking:ClearAllPoints()
-        tracking:SetParent(parent)
-        tracking:SetPoint("TOPLEFT", parent, "TOPLEFT", 6, -6)
-        tracking:SetScale(0.85)
-    end
-
-    -- Mail Notification Icon
-    local mail = _G["MiniMapMailFrame"]
-    if mail then
-        mail:ClearAllPoints()
-        mail:SetParent(parent)
-        mail:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -6, -6)
-        mail:SetScale(0.9)
-    end
-
-    -- Calendar / Game Time (Sun/Moon icon)
-    local gameTime = _G["GameTimeFrame"]
-    if gameTime then
-        gameTime:ClearAllPoints()
-        gameTime:SetParent(parent)
-        gameTime:SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", 6, 6)
-        gameTime:SetScale(0.7)
-    end
-
-    -- Looking For Group / Eye Icon
-    local lfg = _G["MiniMapLFGFrame"] or _G["QueueStatusMinimapButton"]
-    if lfg then
-        lfg:ClearAllPoints()
-        lfg:SetParent(parent)
-        lfg:SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", 24, 6)
-        lfg:SetScale(0.85)
-    end
-
-    -- Battleground / PvP Queue Icon
-    local pvp = _G["MiniMapBattlefieldFrame"]
-    if pvp then
-        pvp:ClearAllPoints()
-        pvp:SetParent(parent)
-        pvp:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -6, 6)
-        pvp:SetScale(0.85)
-    end
 end
 
 -------------------------------------------------------------------------------
@@ -372,7 +333,7 @@ function OneMiniMap:CreateMapFrame()
     frame:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
         self.isMoving = false
-        OneMiniMap:SavePositions()
+        OneMiniMap:SaveMapPosition()
     end)
 
     -- Allow clicking anywhere on Minimap to drag when unlocked
@@ -387,7 +348,7 @@ function OneMiniMap:CreateMapFrame()
     Minimap:SetScript("OnDragStop", function(self)
         frame:StopMovingOrSizing()
         frame.isMoving = false
-        OneMiniMap:SavePositions()
+        OneMiniMap:SaveMapPosition()
     end)
 
     Minimap:SetScript("OnMouseDown", function(self, button)
@@ -400,7 +361,7 @@ function OneMiniMap:CreateMapFrame()
         if button == "LeftButton" and frame.isMoving then
             frame:StopMovingOrSizing()
             frame.isMoving = false
-            OneMiniMap:SavePositions()
+            OneMiniMap:SaveMapPosition()
         end
     end)
 
@@ -418,7 +379,7 @@ function OneMiniMap:CreateTitleFrame()
     frame:SetSize(152, 20)
     frame:SetClampedToScreen(true)
     frame:SetMovable(true)
-    frame:SetFrameStrata("LOW")
+    frame:SetFrameStrata("MEDIUM")
     frame:EnableMouse(true)
     frame:RegisterForDrag("LeftButton")
 
@@ -477,7 +438,13 @@ function OneMiniMap:CreateTitleFrame()
     end)
     frame:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
-        OneMiniMap:SavePositions()
+        local point, _, relPoint, xOfs, yOfs = self:GetPoint()
+        OneMiniMapDB.titlePosition = {
+            point = point or "TOPRIGHT",
+            relPoint = relPoint or "TOPRIGHT",
+            x = math.floor((xOfs or 0) + 0.5),
+            y = math.floor((yOfs or 0) + 0.5),
+        }
     end)
 
     self.titleFrame = frame
@@ -494,7 +461,7 @@ function OneMiniMap:CreateClockFrame()
     frame:SetSize(70, 20)
     frame:SetClampedToScreen(true)
     frame:SetMovable(true)
-    frame:SetFrameStrata("LOW")
+    frame:SetFrameStrata("MEDIUM")
     frame:EnableMouse(true)
     frame:RegisterForDrag("LeftButton")
 
@@ -541,7 +508,13 @@ function OneMiniMap:CreateClockFrame()
     end)
     frame:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
-        OneMiniMap:SavePositions()
+        local point, _, relPoint, xOfs, yOfs = self:GetPoint()
+        OneMiniMapDB.clockPosition = {
+            point = point or "TOPRIGHT",
+            relPoint = relPoint or "TOPRIGHT",
+            x = math.floor((xOfs or 0) + 0.5),
+            y = math.floor((yOfs or 0) + 0.5),
+        }
     end)
 
     self.clockFrame = frame
@@ -555,10 +528,10 @@ function OneMiniMap:CreateCoordFrame()
     if self.coordFrame then return self.coordFrame end
 
     local frame = CreateFrame("Button", "OneMiniMapCoordFrame", UIParent)
-    frame:SetSize(78, 20)
+    frame:SetSize(84, 20)
     frame:SetClampedToScreen(true)
     frame:SetMovable(true)
-    frame:SetFrameStrata("LOW")
+    frame:SetFrameStrata("MEDIUM")
     frame:EnableMouse(true)
     frame:RegisterForDrag("LeftButton")
 
@@ -594,7 +567,13 @@ function OneMiniMap:CreateCoordFrame()
     end)
     frame:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
-        OneMiniMap:SavePositions()
+        local point, _, relPoint, xOfs, yOfs = self:GetPoint()
+        OneMiniMapDB.coordPosition = {
+            point = point or "TOPRIGHT",
+            relPoint = relPoint or "TOPRIGHT",
+            x = math.floor((xOfs or 0) + 0.5),
+            y = math.floor((yOfs or 0) + 0.5),
+        }
     end)
 
     self.coordFrame = frame
@@ -674,56 +653,59 @@ end
 -------------------------------------------------------------------------------
 -- Positions Persistence (Map, Title, Clock, Coords)
 -------------------------------------------------------------------------------
-function OneMiniMap:SavePositions()
+function OneMiniMap:SaveMapPosition()
+    if not self.mapFrame then return end
+    local point, _, relPoint, xOfs, yOfs = self.mapFrame:GetPoint()
     OneMiniMapDB = OneMiniMapDB or {}
-
-    local function Capture(f)
-        if not f then return nil end
-        local point, _, relPoint, xOfs, yOfs = f:GetPoint()
-        return {
-            point = point or "TOPRIGHT",
-            relPoint = relPoint or "TOPRIGHT",
-            x = math.floor((xOfs or 0) + 0.5),
-            y = math.floor((yOfs or 0) + 0.5),
-        }
-    end
-
-    OneMiniMapDB.mapPosition = Capture(self.mapFrame)
-    OneMiniMapDB.titlePosition = Capture(self.titleFrame)
-    OneMiniMapDB.clockPosition = Capture(self.clockFrame)
-    OneMiniMapDB.coordPosition = Capture(self.coordFrame)
+    OneMiniMapDB.mapPosition = {
+        point = point or "TOPRIGHT",
+        relPoint = relPoint or "TOPRIGHT",
+        x = math.floor((xOfs or 0) + 0.5),
+        y = math.floor((yOfs or 0) + 0.5),
+    }
 end
 
 function OneMiniMap:RestorePositions()
-    local function Restore(f, pos, defaultAnchorFn)
-        if not f then return end
-        f:ClearAllPoints()
-        if pos and pos.point and pos.x and pos.y then
-            f:SetPoint(pos.point, UIParent, pos.relPoint or pos.point, pos.x, pos.y)
-        else
-            defaultAnchorFn(f)
-        end
+    -- 1. Map Frame: Default TOPRIGHT of screen (-25, -50)
+    self.mapFrame:ClearAllPoints()
+    if OneMiniMapDB.mapPosition then
+        local pos = OneMiniMapDB.mapPosition
+        self.mapFrame:SetPoint(pos.point or "TOPRIGHT", UIParent, pos.relPoint or "TOPRIGHT", pos.x or -25, pos.y or -50)
+    else
+        self.mapFrame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -25, -50)
     end
 
-    -- 1. Map Frame: Default TOPRIGHT of screen (-25, -50)
-    Restore(self.mapFrame, OneMiniMapDB.mapPosition, function(f)
-        f:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -25, -50)
-    end)
+    -- 2. Title Frame: Attached directly above Map Frame unless independently moved
+    self.titleFrame:ClearAllPoints()
+    if OneMiniMapDB.titlePosition then
+        local pos = OneMiniMapDB.titlePosition
+        self.titleFrame:SetPoint(pos.point or "TOPRIGHT", UIParent, pos.relPoint or "TOPRIGHT", pos.x, pos.y)
+    else
+        self.titleFrame:SetPoint("BOTTOM", self.mapFrame, "TOP", 0, 4)
+    end
 
-    -- 2. Title Frame: Default directly above Map Frame (0, 4)
-    Restore(self.titleFrame, OneMiniMapDB.titlePosition, function(f)
-        f:SetPoint("BOTTOM", self.mapFrame, "TOP", 0, 4)
-    end)
+    -- 3. Clock Frame: Attached below Map Frame on the Left unless independently moved
+    self.clockFrame:ClearAllPoints()
+    if OneMiniMapDB.clockPosition then
+        local pos = OneMiniMapDB.clockPosition
+        self.clockFrame:SetPoint(pos.point or "TOPRIGHT", UIParent, pos.relPoint or "TOPRIGHT", pos.x, pos.y)
+    else
+        self.clockFrame:SetPoint("TOPLEFT", self.mapFrame, "BOTTOMLEFT", 0, -4)
+    end
 
-    -- 3. Clock Frame: Default directly below Map Frame on the Left
-    Restore(self.clockFrame, OneMiniMapDB.clockPosition, function(f)
-        f:SetPoint("TOPLEFT", self.mapFrame, "BOTTOMLEFT", 0, -4)
-    end)
+    -- 4. Coordinates Frame: Attached below Map Frame on the Right unless independently moved
+    self.coordFrame:ClearAllPoints()
+    if OneMiniMapDB.coordPosition then
+        local pos = OneMiniMapDB.coordPosition
+        self.coordFrame:SetPoint(pos.point or "TOPRIGHT", UIParent, pos.relPoint or "TOPRIGHT", pos.x, pos.y)
+    else
+        self.coordFrame:SetPoint("TOPRIGHT", self.mapFrame, "BOTTOMRIGHT", 0, -4)
+    end
 
-    -- 4. Coordinates Frame: Default directly below Map Frame on the Right
-    Restore(self.coordFrame, OneMiniMapDB.coordPosition, function(f)
-        f:SetPoint("TOPRIGHT", self.mapFrame, "BOTTOMRIGHT", 0, -4)
-    end)
+    -- 5. Button Collector
+    if self.ButtonCollector and self.ButtonCollector.RestorePosition then
+        self.ButtonCollector:RestorePosition()
+    end
 end
 
 -------------------------------------------------------------------------------
@@ -769,7 +751,8 @@ function OneMiniMap:Initialize()
     -- Setup Square Mask & Suppress Blizzard Chrome
     SetupSquareMask()
     SuppressBlizzardChrome()
-    SetupMouseWheelZoom()
+    SetupZoomHandling()
+    ProtectActionBars()
 
     -- Create Independent Modular Frames
     self:CreateMapFrame()
@@ -777,9 +760,13 @@ function OneMiniMap:Initialize()
     self:CreateClockFrame()
     self:CreateCoordFrame()
 
+    -- Initialize Button Collector
+    if self.ButtonCollector and self.ButtonCollector.Initialize then
+        self.ButtonCollector:Initialize()
+    end
+
     -- Restore Independent Positions
     self:RestorePositions()
-    DockMinimapButtons()
 
     -- Visibility States
     self.titleFrame:SetShown(OneMiniMapDB.showTitle)
@@ -792,6 +779,9 @@ function OneMiniMap:Initialize()
         self.titleFrame:SetScale(OneMiniMapDB.scale)
         self.clockFrame:SetScale(OneMiniMapDB.scale)
         self.coordFrame:SetScale(OneMiniMapDB.scale)
+        if self.ButtonCollector and self.ButtonCollector.frame then
+            self.ButtonCollector.frame:SetScale(OneMiniMapDB.scale)
+        end
     end
 
     -- Start Update Tickers
@@ -817,7 +807,7 @@ SlashCmdList["ONEMINIMAP"] = function(msg)
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Frames are now |cffff2020LOCKED|r.")
     elseif cmd == "unlock" then
         OneMiniMapDB.locked = false
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Frames are now |cff20ff20UNLOCKED|r. You can click & drag anywhere on the Map, Title, Clock, or Coords to move them.")
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Frames are now |cff20ff20UNLOCKED|r. You can click & drag anywhere on the Map, Title, Clock, Coords, or Button Bar to move them.")
     elseif cmd == "coords" then
         OneMiniMapDB.showCoords = not OneMiniMapDB.showCoords
         if OneMiniMap.coordFrame then
@@ -836,6 +826,17 @@ SlashCmdList["ONEMINIMAP"] = function(msg)
             OneMiniMap.titleFrame:SetShown(OneMiniMapDB.showTitle)
         end
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Title bar toggled " .. (OneMiniMapDB.showTitle and "|cff20ff20ON|r" or "|cffff2020OFF|r") .. ".")
+    elseif cmd == "buttons" or cmd == "bar" then
+        if OneMiniMap.ButtonCollector and OneMiniMap.ButtonCollector.frame then
+            local isShown = OneMiniMap.ButtonCollector.frame:IsShown()
+            OneMiniMap.ButtonCollector.frame:SetShown(not isShown)
+            DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Button Collector toggled " .. (not isShown and "|cff20ff20ON|r" or "|cffff2020OFF|r") .. ".")
+        end
+    elseif cmd == "page1" or cmd == "resetbars" then
+        if ChangeActionBarPage then
+            ChangeActionBarPage(1)
+        end
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Action bar reset to Page 1.")
     elseif cmd == "dump" then
         OneMiniMap:DumpInspection()
     elseif cmd == "reset" then
@@ -843,8 +844,12 @@ SlashCmdList["ONEMINIMAP"] = function(msg)
         OneMiniMapDB.titlePosition = nil
         OneMiniMapDB.clockPosition = nil
         OneMiniMapDB.coordPosition = nil
+        OneMiniMapDB.buttonCollectorPosition = nil
         OneMiniMap:RestorePositions()
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Positions reset to defaults.")
+        if OneMiniMap.ButtonCollector and OneMiniMap.ButtonCollector.Update then
+            OneMiniMap.ButtonCollector:Update()
+        end
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: All positions reset to defaults.")
     elseif cmd == "scale" and tonumber(arg) then
         local s = tonumber(arg)
         if s and s >= 0.5 and s <= 2.0 then
@@ -853,6 +858,9 @@ SlashCmdList["ONEMINIMAP"] = function(msg)
             if OneMiniMap.titleFrame then OneMiniMap.titleFrame:SetScale(s) end
             if OneMiniMap.clockFrame then OneMiniMap.clockFrame:SetScale(s) end
             if OneMiniMap.coordFrame then OneMiniMap.coordFrame:SetScale(s) end
+            if OneMiniMap.ButtonCollector and OneMiniMap.ButtonCollector.frame then
+                OneMiniMap.ButtonCollector.frame:SetScale(s)
+            end
             DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Scale set to " .. s .. ".")
         else
             DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Scale must be between 0.5 and 2.0.")
@@ -864,8 +872,9 @@ SlashCmdList["ONEMINIMAP"] = function(msg)
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm title|r - Toggle title bar frame")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm clock|r - Toggle clock frame")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm coords|r - Toggle coordinates frame")
+        DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm buttons|r - Toggle button collector frame")
+        DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm page1|r - Reset action bar back to Page 1")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm dump|r - Print diagnostic frame inspector details")
-        DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm scale <0.5 - 2.0>|r - Adjust scale")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm reset|r - Reset all frames to default positions")
     end
 end
@@ -889,9 +898,16 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
             OneMiniMap:Initialize()
         else
             SuppressBlizzardChrome()
-            DockMinimapButtons()
+            SetupZoomHandling()
+            ProtectActionBars()
+            if OneMiniMap.ButtonCollector and OneMiniMap.ButtonCollector.Update then
+                OneMiniMap.ButtonCollector:Update()
+            end
         end
     elseif event:find("ZONE_CHANGED") then
         SuppressBlizzardChrome()
+        if SetMapToCurrentZone then
+            SetMapToCurrentZone()
+        end
     end
 end)

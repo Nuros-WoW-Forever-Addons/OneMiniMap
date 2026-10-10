@@ -1,9 +1,10 @@
 ## Interface: 16001, 11200, 20400, 30300, 110000
 ## Title: OneMiniMap
-## Notes: Modular Square MiniMap with metal frame styling, frameless translucent title bar, draggable clock, and draggable coordinates.
+## Notes: Modular Square MiniMap with metal frame styling, frameless translucent title bar, draggable clock, draggable coordinates, and button collector.
 ## Author: Antigravity
-## Version: 0.2.2
+## Version: 0.3.0
 ## SavedVariables: OneMiniMapDB
 ## OptionalDeps: OnePanelUtils, OneSwatter
 
 Core.lua
+ButtonCollector.lua
