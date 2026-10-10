@@ -1,0 +1,9 @@
+## Interface: 16001, 11200, 20400, 30300, 110000
+## Title: OneMiniMap
+## Notes: Square MiniMap replacement with signature metal frame styling, top coordinates, and mouse wheel zoom.
+## Author: Antigravity
+## Version: 0.1.0
+## SavedVariables: OneMiniMapDB
+## OptionalDeps: OnePanelUtils, OneSwatter
+
+Core.lua
