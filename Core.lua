@@ -1,6 +1,6 @@
 --[[
     OneMiniMap - Core.lua
-    Lightweight Square MiniMap replacement with signature metal frame styling,
+    Modular Square MiniMap replacement with signature OneSuite metal frame styling,
     separate frameless translucent title bar, draggable clock frame,
     and draggable coordinates frame.
     Compatibility: Vanilla 1.12, Turtle WoW 1.16, WotLK 3.3.5, and Modern WoW.
@@ -13,7 +13,7 @@ _G.OneMiniMap = _G.OneMiniMap or addonTable
 local OneMiniMap = _G.OneMiniMap
 
 OneMiniMap.name = addonName or "OneMiniMap"
-OneMiniMap.version = "0.2.0"
+OneMiniMap.version = "0.2.1"
 OneMiniMap.isInitialized = false
 
 -- Default Database Configuration
@@ -128,8 +128,26 @@ end
 local hiddenFrame = CreateFrame("Frame")
 hiddenFrame:Hide()
 
+local function KillObject(obj)
+    if not obj then return end
+    pcall(function()
+        obj:Hide()
+        obj:SetAlpha(0)
+        if obj.SetParent then
+            obj:SetParent(hiddenFrame)
+        end
+        if obj.SetTexture then
+            obj:SetTexture("")
+        end
+        if obj.UnregisterAllEvents then
+            obj:UnregisterAllEvents()
+        end
+        obj.Show = function() end
+    end)
+end
+
 local function SuppressBlizzardChrome()
-    -- 1. Neutralize known Blizzard minimap chrome frames by reparenting to permanently hidden frame
+    -- 1. Neutralize known Blizzard minimap chrome frames by reparenting to hidden dummy
     local framesToHide = {
         "MinimapBorder",
         "MinimapBorderTop",
@@ -142,67 +160,38 @@ local function SuppressBlizzardChrome()
     }
 
     for _, frameName in ipairs(framesToHide) do
-        local f = _G[frameName]
-        if f then
-            f:Hide()
-            if f.SetParent then
-                f:SetParent(hiddenFrame)
-            end
-            if f.UnregisterAllEvents then
-                f:UnregisterAllEvents()
-            end
-            if f.SetTexture then
-                f:SetTexture(nil)
-            end
-            if f.SetAlpha then
-                f:SetAlpha(0)
-            end
-            f.Show = function() end
-        end
+        KillObject(_G[frameName])
     end
 
     -- 2. Strip all textures and stray FontStrings from MinimapCluster
     if MinimapCluster then
-        for _, region in ipairs({ MinimapCluster:GetRegions() }) do
-            if region:IsObjectType("Texture") then
-                region:SetTexture(nil)
-                region:SetAlpha(0)
-                region:Hide()
-            elseif region:IsObjectType("FontString") then
-                region:SetText("")
-                region:SetAlpha(0)
-                region:Hide()
+        pcall(function()
+            for _, region in ipairs({ MinimapCluster:GetRegions() }) do
+                KillObject(region)
             end
-        end
+            for _, child in ipairs({ MinimapCluster:GetChildren() }) do
+                if child ~= Minimap and child ~= MiniMapTrackingFrame and child ~= MiniMapMailFrame and child ~= GameTimeFrame then
+                    KillObject(child)
+                end
+            end
+            MinimapCluster:SetAlpha(0)
+            MinimapCluster:EnableMouse(false)
+            MinimapCluster:Hide()
+            MinimapCluster.Show = function() end
+        end)
+    end
 
-        -- Check any children of MinimapCluster that might be third-party or client coordinates
-        for _, child in ipairs({ MinimapCluster:GetChildren() }) do
-            if child ~= Minimap and child ~= MiniMapTrackingFrame and child ~= MiniMapMailFrame and child ~= GameTimeFrame then
-                local childName = child:GetName() or ""
-                if childName:find("Border") or childName:find("Coord") or childName:find("Zone") or childName:find("Zoom") or childName:find("Clock") then
-                    child:Hide()
-                    if child.SetParent then
-                        child:SetParent(hiddenFrame)
-                    end
+    -- 3. Strip any circular border textures directly attached to Minimap
+    pcall(function()
+        for _, region in ipairs({ Minimap:GetRegions() }) do
+            if region:IsObjectType("Texture") then
+                local tex = region:GetTexture()
+                if tex and type(tex) == "string" and (tex:find("Border") or tex:find("Corner") or tex:find("UI%-Minimap")) then
+                    KillObject(region)
                 end
             end
         end
-
-        MinimapCluster:SetAlpha(0)
-        MinimapCluster:EnableMouse(false)
-    end
-
-    -- 3. Strip any border textures that might be attached directly to Minimap
-    for _, region in ipairs({ Minimap:GetRegions() }) do
-        if region:IsObjectType("Texture") then
-            local tex = region:GetTexture()
-            if tex and (type(tex) == "string" and (tex:find("Border") or tex:find("Corner"))) then
-                region:SetTexture(nil)
-                region:SetAlpha(0)
-                region:Hide()
-            end
-        end
-    end
+    end)
 end
 
 -------------------------------------------------------------------------------
@@ -238,12 +227,14 @@ end
 -- Peripheral Minimap Buttons Docking
 -------------------------------------------------------------------------------
 local function DockMinimapButtons()
+    local parent = OneMiniMap.mapFrame or Minimap
+
     -- Tracking Icon (Binoculars / magnifying glass)
     local tracking = _G["MiniMapTracking"] or _G["MiniMapTrackingFrame"]
     if tracking then
         tracking:ClearAllPoints()
-        tracking:SetParent(OneMiniMap.mapFrame or Minimap)
-        tracking:SetPoint("TOPLEFT", OneMiniMap.mapFrame or Minimap, "TOPLEFT", 4, -4)
+        tracking:SetParent(parent)
+        tracking:SetPoint("TOPLEFT", parent, "TOPLEFT", 6, -6)
         tracking:SetScale(0.85)
     end
 
@@ -251,8 +242,8 @@ local function DockMinimapButtons()
     local mail = _G["MiniMapMailFrame"]
     if mail then
         mail:ClearAllPoints()
-        mail:SetParent(OneMiniMap.mapFrame or Minimap)
-        mail:SetPoint("TOPRIGHT", OneMiniMap.mapFrame or Minimap, "TOPRIGHT", -4, -4)
+        mail:SetParent(parent)
+        mail:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -6, -6)
         mail:SetScale(0.9)
     end
 
@@ -260,8 +251,8 @@ local function DockMinimapButtons()
     local gameTime = _G["GameTimeFrame"]
     if gameTime then
         gameTime:ClearAllPoints()
-        gameTime:SetParent(OneMiniMap.mapFrame or Minimap)
-        gameTime:SetPoint("BOTTOMLEFT", OneMiniMap.mapFrame or Minimap, "BOTTOMLEFT", 4, 4)
+        gameTime:SetParent(parent)
+        gameTime:SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", 6, 6)
         gameTime:SetScale(0.7)
     end
 
@@ -269,8 +260,8 @@ local function DockMinimapButtons()
     local lfg = _G["MiniMapLFGFrame"] or _G["QueueStatusMinimapButton"]
     if lfg then
         lfg:ClearAllPoints()
-        lfg:SetParent(OneMiniMap.mapFrame or Minimap)
-        lfg:SetPoint("BOTTOMLEFT", OneMiniMap.mapFrame or Minimap, "BOTTOMLEFT", 22, 4)
+        lfg:SetParent(parent)
+        lfg:SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", 24, 6)
         lfg:SetScale(0.85)
     end
 
@@ -278,8 +269,8 @@ local function DockMinimapButtons()
     local pvp = _G["MiniMapBattlefieldFrame"]
     if pvp then
         pvp:ClearAllPoints()
-        pvp:SetParent(OneMiniMap.mapFrame or Minimap)
-        pvp:SetPoint("BOTTOMRIGHT", OneMiniMap.mapFrame or Minimap, "BOTTOMRIGHT", -4, 4)
+        pvp:SetParent(parent)
+        pvp:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -6, 6)
         pvp:SetScale(0.85)
     end
 end
@@ -296,53 +287,82 @@ function OneMiniMap:CreateMapFrame()
     frame:SetClampedToScreen(true)
     frame:SetMovable(true)
     frame:SetFrameStrata("LOW")
+    frame:EnableMouse(true)
 
-    -- Signature OnePanel / OneStorage Metal Border Styling
+    -- Background Marble/Slate Base
     ApplyBackdrop(frame, {
         bgFile = "Interface\\FrameGeneral\\UI-Background-Marble",
-        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
         tile = true,
         tileSize = 32,
-        edgeSize = 16,
-        insets = { left = 4, right = 4, top = 4, bottom = 4 },
     })
-
     if frame.SetBackdropColor then
         frame:SetBackdropColor(0.2, 0.2, 0.2, 0.98)
     end
-    if frame.SetBackdropBorderColor then
-        frame:SetBackdropBorderColor(0.75, 0.75, 0.75, 1.0) -- Silver / Metal edge
-    end
 
-    -- Reparent Minimap securely inside metal container
+    -- Reparent Minimap securely inside container
     Minimap:SetParent(frame)
     Minimap:ClearAllPoints()
     Minimap:SetPoint("TOPLEFT", frame, "TOPLEFT", 4, -4)
     Minimap:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -4, 4)
     Minimap:SetSize(140, 140)
 
-    -- Dragging Map Frame (When unlocked or Alt+Drag)
-    frame:EnableMouse(true)
+    -- Elevated Border Overlay (FrameLevel + 5) so the signature OnePanel silver metal border sits cleanly over the map edges
+    local borderOverlay = CreateFrame("Frame", nil, frame, backdropTemplate)
+    borderOverlay:SetAllPoints(frame)
+    borderOverlay:SetFrameLevel(frame:GetFrameLevel() + 5)
+    borderOverlay:EnableMouse(false)
+
+    ApplyBackdrop(borderOverlay, {
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        edgeSize = 16,
+        insets = { left = 4, right = 4, top = 4, bottom = 4 },
+    })
+    if borderOverlay.SetBackdropBorderColor then
+        borderOverlay:SetBackdropBorderColor(0.75, 0.75, 0.75, 1.0) -- Silver / Metal edge
+    end
+    frame.BorderOverlay = borderOverlay
+
+    ---------------------------------------------------------------------------
+    -- Direct Dragging & Click Handling (Map Frame & Minimap)
+    ---------------------------------------------------------------------------
     frame:RegisterForDrag("LeftButton")
     frame:SetScript("OnDragStart", function(self)
         if not OneMiniMapDB.locked then
             self:StartMoving()
+            self.isMoving = true
         end
     end)
     frame:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
+        self.isMoving = false
         OneMiniMap:SavePositions()
     end)
 
+    -- Allow clicking anywhere on Minimap to drag when unlocked
     Minimap:EnableMouse(true)
-    Minimap:SetScript("OnMouseDown", function(self, button)
-        if button == "LeftButton" and IsAltKeyDown() and not OneMiniMapDB.locked then
+    Minimap:RegisterForDrag("LeftButton")
+    Minimap:SetScript("OnDragStart", function(self)
+        if not OneMiniMapDB.locked then
             frame:StartMoving()
+            frame.isMoving = true
+        end
+    end)
+    Minimap:SetScript("OnDragStop", function(self)
+        frame:StopMovingOrSizing()
+        frame.isMoving = false
+        OneMiniMap:SavePositions()
+    end)
+
+    Minimap:SetScript("OnMouseDown", function(self, button)
+        if button == "LeftButton" and not OneMiniMapDB.locked then
+            frame:StartMoving()
+            frame.isMoving = true
         end
     end)
     Minimap:SetScript("OnMouseUp", function(self, button)
-        if button == "LeftButton" then
+        if button == "LeftButton" and frame.isMoving then
             frame:StopMovingOrSizing()
+            frame.isMoving = false
             OneMiniMap:SavePositions()
         end
     end)
@@ -434,7 +454,7 @@ function OneMiniMap:CreateClockFrame()
     if self.clockFrame then return self.clockFrame end
 
     local frame = CreateFrame("Button", "OneMiniMapClockFrame", UIParent)
-    frame:SetSize(66, 18)
+    frame:SetSize(68, 20)
     frame:SetClampedToScreen(true)
     frame:SetMovable(true)
     frame:SetFrameStrata("LOW")
@@ -498,7 +518,7 @@ function OneMiniMap:CreateCoordFrame()
     if self.coordFrame then return self.coordFrame end
 
     local frame = CreateFrame("Button", "OneMiniMapCoordFrame", UIParent)
-    frame:SetSize(78, 18)
+    frame:SetSize(76, 20)
     frame:SetClampedToScreen(true)
     frame:SetMovable(true)
     frame:SetFrameStrata("LOW")
@@ -648,25 +668,24 @@ function OneMiniMap:RestorePositions()
         end
     end
 
-    -- 1. Map Frame: Default TOPRIGHT of screen (-16, -26)
+    -- 1. Map Frame: Default TOPRIGHT of screen (-25, -50) giving room for title bar
     Restore(self.mapFrame, OneMiniMapDB.mapPosition, function(f)
-        f:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -16, -26)
+        f:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -25, -50)
     end)
 
-    -- 2. Title Frame: Default directly above Map Frame (0, 3)
+    -- 2. Title Frame: Default directly above Map Frame (0, 4)
     Restore(self.titleFrame, OneMiniMapDB.titlePosition, function(f)
-        f:SetPoint("BOTTOMLEFT", self.mapFrame, "TOPLEFT", 0, 3)
-        f:SetPoint("BOTTOMRIGHT", self.mapFrame, "TOPRIGHT", 0, 3)
+        f:SetPoint("BOTTOM", self.mapFrame, "TOP", 0, 4)
     end)
 
     -- 3. Clock Frame: Default directly below Map Frame on the Left
     Restore(self.clockFrame, OneMiniMapDB.clockPosition, function(f)
-        f:SetPoint("TOPLEFT", self.mapFrame, "BOTTOMLEFT", 0, -3)
+        f:SetPoint("TOPLEFT", self.mapFrame, "BOTTOMLEFT", 0, -4)
     end)
 
     -- 4. Coordinates Frame: Default directly below Map Frame on the Right
     Restore(self.coordFrame, OneMiniMapDB.coordPosition, function(f)
-        f:SetPoint("TOPRIGHT", self.mapFrame, "BOTTOMRIGHT", 0, -3)
+        f:SetPoint("TOPRIGHT", self.mapFrame, "BOTTOMRIGHT", 0, -4)
     end)
 end
 
@@ -735,7 +754,7 @@ SlashCmdList["ONEMINIMAP"] = function(msg)
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Frames are now |cffff2020LOCKED|r.")
     elseif cmd == "unlock" then
         OneMiniMapDB.locked = false
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Frames are now |cff20ff20UNLOCKED|r (drag Map, Title, Clock, or Coords to move).")
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Frames are now |cff20ff20UNLOCKED|r. You can click & drag anywhere on the Map, Title, Clock, or Coords to move them.")
     elseif cmd == "coords" then
         OneMiniMapDB.showCoords = not OneMiniMapDB.showCoords
         if OneMiniMap.coordFrame then
@@ -792,6 +811,9 @@ local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
 eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+eventFrame:RegisterEvent("ZONE_CHANGED")
+eventFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+eventFrame:RegisterEvent("ZONE_CHANGED_INDOORS")
 
 eventFrame:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 == "OneMiniMap" then
@@ -803,5 +825,7 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
             SuppressBlizzardChrome()
             DockMinimapButtons()
         end
+    elseif event:find("ZONE_CHANGED") then
+        SuppressBlizzardChrome()
     end
 end)
