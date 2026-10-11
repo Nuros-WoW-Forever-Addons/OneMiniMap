@@ -55,7 +55,7 @@ function BC:CreateOptionsButton()
     -- Icon Texture
     local icon = btn:CreateTexture(nil, "ARTWORK")
     icon:SetAllPoints(btn)
-    icon:SetTexture("Interface\\Icons\\INV_Misc_Compass_01")
+    icon:SetTexture("Interface\\Icons\\inv_misc_map02")
     icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     btn.icon = icon
 
@@ -168,6 +168,28 @@ function BC:CreateFrame()
         GameTooltip:Hide()
     end)
 
+    -- Blizzard Layout & MarkDirty Support
+    -- Prevents 'attempt to call a nil value' when reparented frames (e.g. MiniMapMailFrame) call self:GetParent():Layout()
+    frame.Layout = function(self)
+        if self.isUpdatingLayout then return end
+        self.isUpdatingLayout = true
+        if OneMiniMap.ButtonCollector and OneMiniMap.ButtonCollector.Update then
+            OneMiniMap.ButtonCollector:Update()
+        end
+        self.isUpdatingLayout = false
+    end
+    frame.MarkDirty = function(self)
+        if self.Layout then self:Layout() end
+    end
+
+    -- Event listener for mail and indicators
+    frame:RegisterEvent("UPDATE_PENDING_MAIL")
+    frame:SetScript("OnEvent", function(self, event)
+        if event == "UPDATE_PENDING_MAIL" then
+            if self.Layout then self:Layout() end
+        end
+    end)
+
     self.frame = frame
     self:CreateOptionsButton()
     return frame
@@ -270,7 +292,7 @@ function BC:Update()
     table.insert(collected, optBtn)
     seen[optBtn] = true
 
-    local function AddButton(btn)
+    local function AddButton(btn, forceInclude)
         if not btn then return end
         if seen[btn] then return end
         local name = btn:GetName() or ""
@@ -280,27 +302,35 @@ function BC:Update()
             return
         end
 
+        -- Conditional check: only include if forced or already shown
+        if not forceInclude and not btn:IsShown() then
+            return
+        end
+
         seen[btn] = true
         table.insert(collected, btn)
     end
 
     -- 1. Standard Blizzard Minimap Buttons across WoW generations
-    -- Tracking / Finder
+    -- Tracking / Finder (always include)
     local trackingBtn = _G["MiniMapTrackingFrame"] or _G["MiniMapTracking"]
     if not trackingBtn and MinimapCluster and MinimapCluster.Tracking then
         trackingBtn = MinimapCluster.Tracking
     end
-    AddButton(trackingBtn)
+    AddButton(trackingBtn, true)
 
-    -- Calendar / Game Time
-    AddButton(_G["GameTimeFrame"])
+    -- Calendar / Game Time (always include)
+    AddButton(_G["GameTimeFrame"], true)
 
-    -- Mail
+    -- Mail (only include if player actually has pending mail)
     local mailBtn = _G["MiniMapMailFrame"]
     if not mailBtn and MinimapCluster and MinimapCluster.IndicatorFrame and MinimapCluster.IndicatorFrame.MailFrame then
         mailBtn = MinimapCluster.IndicatorFrame.MailFrame
     end
-    AddButton(mailBtn)
+    local hasMail = (HasNewMail and HasNewMail()) or (mailBtn and mailBtn:IsShown())
+    if mailBtn and hasMail then
+        AddButton(mailBtn, true)
+    end
 
     -- Battlefield / PvP
     AddButton(_G["MiniMapBattlefieldFrame"])
@@ -319,7 +349,7 @@ function BC:Update()
                 if n ~= "" and not seen[child] then
                     local ln = n:lower()
                     if ln:find("button") or ln:find("icon") or ln:find("tracking") or ln:find("mail") or ln:find("time") or ln:find("pvp") or ln:find("lfg") then
-                        AddButton(child)
+                        AddButton(child, child:IsShown())
                     end
                 end
             end
@@ -333,7 +363,7 @@ function BC:Update()
                 if not child.IsForbidden or not child:IsForbidden() then
                     local n = child:GetName() or ""
                     if n:find("^LibDBIcon10_") or n:find("MinimapButton$") or n:find("MiniMapButton$") then
-                        AddButton(child)
+                        AddButton(child, child:IsShown())
                     end
                 end
             end

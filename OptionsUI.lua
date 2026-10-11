@@ -97,7 +97,7 @@ function OptionsUI:CreateStandaloneWindow()
     local icon = frame:CreateTexture(nil, "ARTWORK")
     icon:SetSize(22, 22)
     icon:SetPoint("TOPLEFT", frame, "TOPLEFT", 14, -14)
-    icon:SetTexture("Interface\\Icons\\INV_Misc_Compass_01")
+    icon:SetTexture("Interface\\Icons\\inv_misc_map02")
 
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     title:SetPoint("LEFT", icon, "RIGHT", 8, 0)
@@ -243,7 +243,7 @@ function OptionsUI:RegisterBlizzardPanel()
     local icon = panel:CreateTexture(nil, "ARTWORK")
     icon:SetSize(28, 28)
     icon:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -16)
-    icon:SetTexture("Interface\\Icons\\INV_Misc_Compass_01")
+    icon:SetTexture("Interface\\Icons\\inv_misc_map02")
 
     local title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("LEFT", icon, "RIGHT", 10, 0)
@@ -266,7 +266,7 @@ function OptionsUI:RegisterBlizzardPanel()
     elseif Settings and Settings.RegisterCanvasLayoutCategory then
         local cat = Settings.RegisterCanvasLayoutCategory(panel, "OneMiniMap")
         if cat and cat.SetIcon then
-            pcall(function() cat:SetIcon("Interface\\Icons\\INV_Misc_Compass_01") end)
+            pcall(function() cat:SetIcon("Interface\\Icons\\inv_misc_map02") end)
         end
         Settings.RegisterAddOnCategory(cat)
     end

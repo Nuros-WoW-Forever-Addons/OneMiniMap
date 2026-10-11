@@ -13,7 +13,7 @@ _G.OneMiniMap = _G.OneMiniMap or addonTable
 local OneMiniMap = _G.OneMiniMap
 
 OneMiniMap.name = addonName or "OneMiniMap"
-OneMiniMap.version = "0.3.1"
+OneMiniMap.version = "0.3.2"
 OneMiniMap.isInitialized = false
 
 -- Default Database Configuration
