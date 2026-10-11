@@ -936,6 +936,13 @@ SlashCmdList["ONEMINIMAP"] = function(msg)
         else
             DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Scale must be between 0.5 and 2.0.")
         end
+    elseif cmd == "test" or cmd == "testbuttons" then
+        OneMiniMapDB.testMode = not OneMiniMapDB.testMode
+        if OneMiniMap.ButtonCollector and OneMiniMap.ButtonCollector.Update then
+            OneMiniMap.ButtonCollector:Update()
+        end
+        local st = OneMiniMapDB.testMode and "|cff20ff20ON (12 buttons, 2 columns)|r" or "|cffff2020OFF|r"
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Test mode " .. st .. ".")
     else
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r commands:")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm lock|r - Lock all frame positions")

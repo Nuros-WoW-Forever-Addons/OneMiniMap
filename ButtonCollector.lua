@@ -152,8 +152,8 @@ function BC:ShowDragPreview()
     local maxRows = 8
 
     local totalButtons = #(self.buttons or {})
-    local cols = math.ceil(math.max(totalButtons, 1) / maxRows)
-    if cols < 1 then cols = 1 end
+    -- Full-scale preview always shows at least 2 columns (16 slots) so user can see full expansion footprint
+    local cols = math.max(2, math.ceil(totalButtons / maxRows))
 
     local totalSlots = cols * maxRows
     local totalWidth = (cols * buttonSize) + ((cols - 1) * spacing) + (padding * 2)
@@ -163,6 +163,22 @@ function BC:ShowDragPreview()
 
     local growthDir = self:GetGrowthDirection()
 
+    -- Re-position active real buttons to match the 2-column preview layout
+    for i, btn in ipairs(self.buttons or {}) do
+        local colIdx = math.floor((i - 1) / maxRows)
+        local rowIdx = (i - 1) % maxRows
+        local yOfs = -headerHeight - padding - (rowIdx * (buttonSize + spacing))
+        local xOfs
+        if growthDir == "LEFT" then
+            xOfs = totalWidth - padding - buttonSize - (colIdx * (buttonSize + spacing))
+        else
+            xOfs = padding + (colIdx * (buttonSize + spacing))
+        end
+        btn:ClearAllPoints()
+        btn:SetPoint("TOPLEFT", self.frame, "TOPLEFT", xOfs, yOfs)
+    end
+
+    -- Create & show ghost slots for all unoccupied slots up to 16
     for i = 1, totalSlots do
         local isOccupied = (i <= totalButtons)
         local colIdx = math.floor((i - 1) / maxRows)
@@ -184,24 +200,24 @@ function BC:ShowDragPreview()
             local bg = slot:CreateTexture(nil, "BACKGROUND")
             bg:SetAllPoints(slot)
             if bg.SetColorTexture then
-                bg:SetColorTexture(0.18, 0.18, 0.18, 0.40)
+                bg:SetColorTexture(0.18, 0.18, 0.18, 0.45)
             else
                 bg:SetTexture("Interface\\Buttons\\WHITE8X8")
-                bg:SetVertexColor(0.18, 0.18, 0.18, 0.40)
+                bg:SetVertexColor(0.18, 0.18, 0.18, 0.45)
             end
 
             local border = slot:CreateTexture(nil, "OVERLAY")
             border:SetPoint("TOPLEFT", slot, "TOPLEFT", 1, -1)
             border:SetPoint("BOTTOMRIGHT", slot, "BOTTOMRIGHT", -1, 1)
             if border.SetColorTexture then
-                border:SetColorTexture(0.55, 0.55, 0.55, 0.35)
+                border:SetColorTexture(0.55, 0.55, 0.55, 0.40)
             end
 
             local text = slot:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
             text:SetPoint("CENTER", slot, "CENTER", 0, 0)
-            text:SetText("+")
+            text:SetText(tostring(i))
             if text.SetTextColor then
-                text:SetTextColor(0.6, 0.6, 0.6, 0.5)
+                text:SetTextColor(0.65, 0.65, 0.65, 0.70)
             end
 
             slot.bg = bg
@@ -212,6 +228,9 @@ function BC:ShowDragPreview()
 
         slot:ClearAllPoints()
         slot:SetPoint("TOPLEFT", self.frame, "TOPLEFT", xOfs, yOfs)
+        if slot.text then
+            slot.text:SetText(tostring(i))
+        end
 
         if isOccupied then
             slot:Hide()
@@ -561,6 +580,48 @@ function BC:Update()
                     end
                 end
             end
+        end
+    end
+
+    -- 4. Test Mode (adds dummy buttons up to 12 slots to preview 2-column wrapping)
+    if OneMiniMapDB and OneMiniMapDB.testMode then
+        self.testButtons = self.testButtons or {}
+        local testIcons = {
+            "Interface\\Icons\\INV_Misc_Bag_08",
+            "Interface\\Icons\\Spell_Holy_MagicalSentry",
+            "Interface\\Icons\\Ability_Rogue_Ambush",
+            "Interface\\Icons\\Spell_Frost_FrostBolt02",
+            "Interface\\Icons\\INV_Potion_51",
+            "Interface\\Icons\\Spell_Nature_HealingTouch",
+            "Interface\\Icons\\INV_Sword_04",
+            "Interface\\Icons\\Spell_Fire_FlameBlades",
+        }
+        for idx, iconPath in ipairs(testIcons) do
+            local tBtn = self.testButtons[idx]
+            if not tBtn then
+                tBtn = CreateFrame("Button", "OneMiniMapTestBtn" .. idx, self.frame)
+                tBtn:SetSize(26, 26)
+                local ic = tBtn:CreateTexture(nil, "ARTWORK")
+                ic:SetSize(20, 20)
+                ic:SetPoint("CENTER", tBtn, "CENTER", 0, 0)
+                ic:SetTexture(iconPath)
+                if ic.SetTexCoord then ic:SetTexCoord(0.08, 0.92, 0.08, 0.92) end
+                tBtn.icon = ic
+                tBtn:SetScript("OnEnter", function(s)
+                    GameTooltip:SetOwner(s, "ANCHOR_LEFT")
+                    GameTooltip:AddLine("Test Button #" .. (idx + 4), 1, 1, 1)
+                    GameTooltip:AddLine("Demonstrating 2-column auto-wrapping (>8 buttons)", 0.7, 0.7, 0.7)
+                    GameTooltip:Show()
+                end)
+                tBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+                self.testButtons[idx] = tBtn
+            end
+            tBtn:Show()
+            table.insert(collected, tBtn)
+        end
+    elseif self.testButtons then
+        for _, tBtn in ipairs(self.testButtons) do
+            tBtn:Hide()
         end
     end
 

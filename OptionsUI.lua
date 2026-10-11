@@ -103,7 +103,7 @@ function OptionsUI:CreateStandaloneWindow()
     if standaloneWindow then return standaloneWindow end
 
     local frame = CreateFrame("Frame", "OneMiniMapOptionsFrame", UIParent, backdropTemplate)
-    frame:SetSize(360, 420)
+    frame:SetSize(360, 460)
     frame:SetFrameStrata("DIALOG")
     frame:SetToplevel(true)
     frame:SetClampedToScreen(true)
@@ -237,7 +237,7 @@ function OptionsUI:CreateStandaloneWindow()
     yOfs = yOfs - spacing
 
     -- 7. 2 Columns for Button Collector
-    local cbCols = CreateCheckbox(frame, "Use 2 Columns for Buttons (Default: 1)", 
+    local cbCols = CreateCheckbox(frame, "Force 2 Columns (Auto-wraps at > 8 buttons)", 
         function() return OneMiniMapDB and (OneMiniMapDB.buttonCols == 2) end,
         function(val)
             OneMiniMapDB.buttonCols = val and 2 or 1
@@ -283,6 +283,17 @@ function OptionsUI:CreateStandaloneWindow()
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Action bar reset to Page 1.")
     end)
     btnBar:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -18, yOfs)
+    yOfs = yOfs - 30
+
+    local btnTest = CreateButton(frame, "Toggle Test Mode (12 Buttons)", 324, 24, function()
+        OneMiniMapDB.testMode = not OneMiniMapDB.testMode
+        if OneMiniMap.ButtonCollector and OneMiniMap.ButtonCollector.Update then
+            OneMiniMap.ButtonCollector:Update()
+        end
+        local st = OneMiniMapDB.testMode and "|cff20ff20ON (12 buttons, 2 columns)|r" or "|cffff2020OFF|r"
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Test mode " .. st .. ".")
+    end)
+    btnTest:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, yOfs)
 
     -- Esc key closing
     if table and table.insert and UISpecialFrames then

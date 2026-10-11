@@ -2,7 +2,7 @@
 ## Title: OneMiniMap
 ## Notes: Modular Square MiniMap with metal frame styling, frameless translucent title bar, draggable clock, draggable coordinates, and button collector.
 ## Author: Antigravity
-## Version: 0.3.5
+## Version: 0.3.6
 ## IconTexture: Interface\Icons\inv_misc_map02
 ## SavedVariables: OneMiniMapDB
 ## OptionalDeps: OnePanelUtils, OneSwatter
