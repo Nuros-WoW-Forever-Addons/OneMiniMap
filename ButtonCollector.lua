@@ -49,26 +49,28 @@ function BC:CreateOptionsButton()
     if self.optionsButton then return self.optionsButton end
 
     local btn = CreateFrame("Button", "OneMiniMapOptionsButton", self.frame)
-    btn:SetSize(30, 30)
+    btn:SetSize(26, 26)
     btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 
-    -- Icon Texture
+    -- Icon Texture (20x20 centered)
     local icon = btn:CreateTexture(nil, "ARTWORK")
-    icon:SetAllPoints(btn)
+    icon:SetSize(20, 20)
+    icon:SetPoint("CENTER", btn, "CENTER", 0, 0)
     icon:SetTexture("Interface\\Icons\\inv_misc_map02")
     icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     btn.icon = icon
 
     -- Highlight Texture
     local highlight = btn:CreateTexture(nil, "HIGHLIGHT")
-    highlight:SetAllPoints(btn)
+    highlight:SetSize(22, 22)
+    highlight:SetPoint("CENTER", btn, "CENTER", 0, 0)
     highlight:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
     highlight:SetBlendMode("ADD")
 
     -- Border Overlay
     local border = btn:CreateTexture(nil, "OVERLAY")
-    border:SetPoint("TOPLEFT", btn, "TOPLEFT", -1, 1)
-    border:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", 1, -1)
+    border:SetPoint("TOPLEFT", icon, "TOPLEFT", -1, 1)
+    border:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", 1, -1)
     if border.SetColorTexture then
         border:SetColorTexture(0.5, 0.5, 0.5, 0.4)
     end
@@ -135,16 +137,16 @@ function BC:CreateFrame()
         frame:SetBackdropBorderColor(0.60, 0.60, 0.60, 0.80)
     end
 
-    -- Dragging
-    frame:SetScript("OnDragStart", function(self)
+    -- Dragging Helpers
+    local function StartMoving()
         if not OneMiniMapDB or not OneMiniMapDB.locked then
-            self:StartMoving()
+            frame:StartMoving()
         end
-    end)
-    frame:SetScript("OnDragStop", function(self)
-        self:StopMovingOrSizing()
+    end
+    local function StopMoving()
+        frame:StopMovingOrSizing()
         if OneMiniMapDB then
-            local point, _, relPoint, xOfs, yOfs = self:GetPoint()
+            local point, _, relPoint, xOfs, yOfs = frame:GetPoint()
             OneMiniMapDB.buttonCollectorPosition = {
                 point = point or "TOPRIGHT",
                 relPoint = relPoint or "TOPRIGHT",
@@ -152,9 +154,56 @@ function BC:CreateFrame()
                 y = math.floor((yOfs or 0) + 0.5),
             }
         end
-    end)
+    end
 
-    -- Tooltip on Bar Hover
+    -- Dedicated Drag Header / Grip Handle (14px high)
+    local dragHeader = CreateFrame("Frame", nil, frame)
+    dragHeader:SetHeight(14)
+    dragHeader:SetPoint("TOPLEFT", frame, "TOPLEFT", 1, -1)
+    dragHeader:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -1, -1)
+    dragHeader:EnableMouse(true)
+    dragHeader:RegisterForDrag("LeftButton")
+
+    local grip = dragHeader:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    grip:SetPoint("CENTER", dragHeader, "CENTER", 0, 0)
+    grip:SetText("•••")
+    if grip.SetTextColor then
+        grip:SetTextColor(0.65, 0.65, 0.65, 0.85)
+    end
+    dragHeader.grip = grip
+
+    dragHeader:SetScript("OnMouseDown", function(self, button)
+        if button == "LeftButton" then StartMoving() end
+    end)
+    dragHeader:SetScript("OnMouseUp", function(self, button)
+        if button == "LeftButton" then StopMoving() end
+    end)
+    dragHeader:SetScript("OnDragStart", StartMoving)
+    dragHeader:SetScript("OnDragStop", StopMoving)
+
+    dragHeader:SetScript("OnEnter", function(self)
+        if grip.SetTextColor then grip:SetTextColor(1, 0.82, 0, 1) end
+        GameTooltip:SetOwner(self, "ANCHOR_TOPLEFT")
+        GameTooltip:ClearLines()
+        GameTooltip:AddLine("Minimap Buttons", 1, 1, 1)
+        if not OneMiniMapDB or not OneMiniMapDB.locked then
+            GameTooltip:AddLine("|cff00ccffClick & drag|r to reposition", 0.7, 0.7, 0.7)
+        else
+            GameTooltip:AddLine("Frames are |cffff2020Locked|r", 0.7, 0.7, 0.7)
+        end
+        GameTooltip:Show()
+    end)
+    dragHeader:SetScript("OnLeave", function(self)
+        if grip.SetTextColor then grip:SetTextColor(0.65, 0.65, 0.65, 0.85) end
+        GameTooltip:Hide()
+    end)
+    frame.dragHeader = dragHeader
+
+    -- Also allow dragging from empty background areas of frame
+    frame:SetScript("OnDragStart", StartMoving)
+    frame:SetScript("OnDragStop", StopMoving)
+
+    -- Tooltip on Bar Hover (background)
     frame:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOPLEFT")
         GameTooltip:ClearLines()
@@ -231,6 +280,9 @@ local function SkinTracking(btn)
         if not currTex or currTex == "" or tostring(currTex):lower():find("questionmark") then
             icon:SetTexture("Interface\\Icons\\INV_Misc_Spyglass_02")
         end
+        icon:ClearAllPoints()
+        icon:SetSize(20, 20)
+        icon:SetPoint("CENTER", btn, "CENTER", 0, 0)
         if icon.SetTexCoord then
             icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
         end
@@ -254,12 +306,31 @@ local function SkinCalendar(btn)
         end
     end
 
-    -- Keep the calendar day text crisp and centered
+    -- Size and center the calendar icon & day font cleanly inside 26x26 button
     if btn.GetRegions then
         for _, r in ipairs({ btn:GetRegions() }) do
-            if r:IsObjectType("FontString") then
+            if r:IsObjectType("Texture") then
+                local t = tostring(r:GetTexture() or ""):lower()
+                if t:find("border") or t:find("glow") or t:find("shine") or t:find("halo") then
+                    r:Hide()
+                    if r.SetAlpha then r:SetAlpha(0) end
+                elseif t ~= "" then
+                    r:ClearAllPoints()
+                    r:SetSize(20, 20)
+                    r:SetPoint("CENTER", btn, "CENTER", 0, 0)
+                    if r.SetTexCoord then
+                        r:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+                    end
+                end
+            elseif r:IsObjectType("FontString") then
                 r:ClearAllPoints()
-                r:SetPoint("CENTER", btn, "CENTER", 0, -2)
+                r:SetPoint("CENTER", btn, "CENTER", 0, -1)
+                if r.SetFont then
+                    local font, size, flags = r:GetFont()
+                    if font and size and size > 11 then
+                        r:SetFont(font, 10, flags or "OUTLINE")
+                    end
+                end
             end
         end
     end
@@ -373,9 +444,11 @@ function BC:Update()
     self.buttons = collected
 
     -- Layout in vertical column(s)
-    local buttonSize = 30
+    local buttonSize = 26
+    local iconSize = 20
     local spacing = 3
-    local padding = 4
+    local padding = 3
+    local headerHeight = 14
     local cols = (OneMiniMapDB and OneMiniMapDB.buttonCols) or 1
     local totalButtons = #collected
 
@@ -383,7 +456,7 @@ function BC:Update()
     if rows < 1 then rows = 1 end
 
     local totalWidth = (cols * buttonSize) + ((cols - 1) * spacing) + (padding * 2)
-    local totalHeight = (rows * buttonSize) + ((rows - 1) * spacing) + (padding * 2)
+    local totalHeight = headerHeight + (rows * buttonSize) + ((rows - 1) * spacing) + (padding * 2)
 
     self.frame:SetSize(totalWidth, totalHeight)
 
@@ -392,7 +465,7 @@ function BC:Update()
         local row = math.floor((i - 1) / cols)
 
         local xOfs = padding + (col * (buttonSize + spacing))
-        local yOfs = -padding - (row * (buttonSize + spacing))
+        local yOfs = -headerHeight - padding - (row * (buttonSize + spacing))
 
         btn:SetParent(self.frame)
         btn:ClearAllPoints()
@@ -401,6 +474,16 @@ function BC:Update()
         btn:SetScale(1.0)
         btn:SetAlpha(1.0)
         btn:Show()
+
+        -- Normalize icon size for third-party / LibDBIcon buttons
+        if btn.icon and btn ~= optBtn then
+            btn.icon:ClearAllPoints()
+            btn.icon:SetSize(iconSize, iconSize)
+            btn.icon:SetPoint("CENTER", btn, "CENTER", 0, 0)
+            if btn.icon.SetTexCoord then
+                btn.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+            end
+        end
 
         -- Apply tailored skinning
         if btn == trackingBtn then

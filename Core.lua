@@ -13,7 +13,7 @@ _G.OneMiniMap = _G.OneMiniMap or addonTable
 local OneMiniMap = _G.OneMiniMap
 
 OneMiniMap.name = addonName or "OneMiniMap"
-OneMiniMap.version = "0.3.2"
+OneMiniMap.version = "0.3.3"
 OneMiniMap.isInitialized = false
 
 -- Default Database Configuration
@@ -159,23 +159,11 @@ local function SetupZoomHandling()
         end)
     end
 
-    -- Hook native +/- buttons (both modern Minimap.ZoomIn and legacy MinimapZoomIn)
-    local zIn = (Minimap and Minimap.ZoomIn) or _G["MinimapZoomIn"]
-    if zIn then
-        zIn:SetScript("OnClick", function() DoZoom(1) end)
-    end
-    local zOut = (Minimap and Minimap.ZoomOut) or _G["MinimapZoomOut"]
-    if zOut then
-        zOut:SetScript("OnClick", function() DoZoom(-1) end)
-    end
-
     -- Global zoom function overrides
     Minimap_ZoomIn = function() DoZoom(1) end
     Minimap_ZoomOut = function() DoZoom(-1) end
     Minimap_ZoomInClick = function() DoZoom(1) end
     Minimap_ZoomOutClick = function() DoZoom(-1) end
-
-    UpdateZoomButtonStates()
 end
 
 -------------------------------------------------------------------------------
@@ -248,10 +236,23 @@ local function SuppressBlizzardChrome()
         "TimeManagerClockButton",
         "MinimapNorthTag",
         "MinimapCompassTexture",
+        "MinimapZoomIn",
+        "MinimapZoomOut",
+        "MiniMapZoomIn",
+        "MiniMapZoomOut",
     }
 
     for _, frameName in ipairs(framesToHide) do
         KillObject(_G[frameName])
+    end
+
+    if Minimap then
+        KillObject(Minimap.ZoomIn)
+        KillObject(Minimap.ZoomOut)
+    end
+    if MinimapCluster then
+        KillObject(MinimapCluster.ZoomIn)
+        KillObject(MinimapCluster.ZoomOut)
     end
 
     -- Neutralize MinimapBackdrop
@@ -278,7 +279,6 @@ local function SuppressBlizzardChrome()
                     or (MinimapCluster.IndicatorFrame and child == MinimapCluster.IndicatorFrame)
                     or (child == GameTimeFrame)
                     or (child == _G["QueueStatusMinimapButton"])
-                    or (cname:find("Zoom") ~= nil)
                     or (cname:find("^OneMiniMap") ~= nil)
                 if not isEssential then
                     KillObject(child)
@@ -325,7 +325,7 @@ function OneMiniMap:CreateMapFrame()
 
     local backdropTemplate = BackdropTemplateMixin and "BackdropTemplate" or nil
     local frame = CreateFrame("Frame", "OneMiniMapFrame", UIParent, backdropTemplate)
-    frame:SetSize(152, 152)
+    frame:SetSize(222, 222)
     frame:SetClampedToScreen(true)
     frame:SetMovable(true)
     frame:SetFrameStrata("LOW")
@@ -346,7 +346,7 @@ function OneMiniMap:CreateMapFrame()
     Minimap:ClearAllPoints()
     Minimap:SetPoint("TOPLEFT", frame, "TOPLEFT", 6, -6)
     Minimap:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -6, 6)
-    Minimap:SetSize(140, 140)
+    Minimap:SetSize(210, 210)
 
     -- Elevated Border Overlay (FrameLevel + 10) matching OnePanel silver dialog border
     local borderOverlay = CreateFrame("Frame", nil, frame, backdropTemplate)
@@ -420,7 +420,7 @@ function OneMiniMap:CreateTitleFrame()
     if self.titleFrame then return self.titleFrame end
 
     local frame = CreateFrame("Button", "OneMiniMapTitleFrame", UIParent)
-    frame:SetSize(152, 20)
+    frame:SetSize(222, 22)
     frame:SetClampedToScreen(true)
     frame:SetMovable(true)
     frame:SetFrameStrata("MEDIUM")
@@ -502,7 +502,7 @@ function OneMiniMap:CreateClockFrame()
     if self.clockFrame then return self.clockFrame end
 
     local frame = CreateFrame("Button", "OneMiniMapClockFrame", UIParent)
-    frame:SetSize(74, 20)
+    frame:SetSize(109, 22)
     frame:SetClampedToScreen(true)
     frame:SetMovable(true)
     frame:SetFrameStrata("MEDIUM")
@@ -572,7 +572,7 @@ function OneMiniMap:CreateCoordFrame()
     if self.coordFrame then return self.coordFrame end
 
     local frame = CreateFrame("Button", "OneMiniMapCoordFrame", UIParent)
-    frame:SetSize(74, 20)
+    frame:SetSize(109, 22)
     frame:SetClampedToScreen(true)
     frame:SetMovable(true)
     frame:SetFrameStrata("MEDIUM")
@@ -710,13 +710,13 @@ function OneMiniMap:SaveMapPosition()
 end
 
 function OneMiniMap:RestorePositions()
-    -- 1. Map Frame: Default TOPRIGHT of screen (-25, -60)
+    -- 1. Map Frame: Default TOPRIGHT of screen (-25, -70)
     self.mapFrame:ClearAllPoints()
     if OneMiniMapDB.mapPosition then
         local pos = OneMiniMapDB.mapPosition
-        self.mapFrame:SetPoint(pos.point or "TOPRIGHT", UIParent, pos.relPoint or "TOPRIGHT", pos.x or -25, pos.y or -60)
+        self.mapFrame:SetPoint(pos.point or "TOPRIGHT", UIParent, pos.relPoint or "TOPRIGHT", pos.x or -25, pos.y or -70)
     else
-        self.mapFrame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -25, -60)
+        self.mapFrame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -25, -70)
     end
 
     -- 2. Title Frame: Attached directly above Map Frame unless independently moved
@@ -749,6 +749,24 @@ function OneMiniMap:RestorePositions()
     -- 5. Button Collector
     if self.ButtonCollector and self.ButtonCollector.RestorePosition then
         self.ButtonCollector:RestorePosition()
+    end
+end
+
+-------------------------------------------------------------------------------
+-- Dynamic Scale Controller
+-------------------------------------------------------------------------------
+function OneMiniMap:SetScale(s)
+    s = tonumber(s) or 1.0
+    if s < 0.5 then s = 0.5 end
+    if s > 2.0 then s = 2.0 end
+    OneMiniMapDB = OneMiniMapDB or {}
+    OneMiniMapDB.scale = s
+    if self.mapFrame then self.mapFrame:SetScale(s) end
+    if self.titleFrame then self.titleFrame:SetScale(s) end
+    if self.clockFrame then self.clockFrame:SetScale(s) end
+    if self.coordFrame then self.coordFrame:SetScale(s) end
+    if self.ButtonCollector and self.ButtonCollector.frame then
+        self.ButtonCollector.frame:SetScale(s)
     end
 end
 
@@ -826,15 +844,7 @@ function OneMiniMap:Initialize()
     self.coordFrame:SetShown(OneMiniMapDB.showCoords)
 
     -- Apply Scale
-    if OneMiniMapDB.scale and OneMiniMapDB.scale ~= 1.0 then
-        self.mapFrame:SetScale(OneMiniMapDB.scale)
-        self.titleFrame:SetScale(OneMiniMapDB.scale)
-        self.clockFrame:SetScale(OneMiniMapDB.scale)
-        self.coordFrame:SetScale(OneMiniMapDB.scale)
-        if self.ButtonCollector and self.ButtonCollector.frame then
-            self.ButtonCollector.frame:SetScale(OneMiniMapDB.scale)
-        end
-    end
+    self:SetScale(OneMiniMapDB.scale or 1.0)
 
     -- Start Update Tickers
     self:UpdateClock()
@@ -912,15 +922,8 @@ SlashCmdList["ONEMINIMAP"] = function(msg)
     elseif cmd == "scale" and tonumber(arg) then
         local s = tonumber(arg)
         if s and s >= 0.5 and s <= 2.0 then
-            OneMiniMapDB.scale = s
-            if OneMiniMap.mapFrame then OneMiniMap.mapFrame:SetScale(s) end
-            if OneMiniMap.titleFrame then OneMiniMap.titleFrame:SetScale(s) end
-            if OneMiniMap.clockFrame then OneMiniMap.clockFrame:SetScale(s) end
-            if OneMiniMap.coordFrame then OneMiniMap.coordFrame:SetScale(s) end
-            if OneMiniMap.ButtonCollector and OneMiniMap.ButtonCollector.frame then
-                OneMiniMap.ButtonCollector.frame:SetScale(s)
-            end
-            DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Scale set to " .. s .. ".")
+            OneMiniMap:SetScale(s)
+            DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Scale set to " .. string.format("%.0f%%", s * 100) .. ".")
         else
             DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Scale must be between 0.5 and 2.0.")
         end

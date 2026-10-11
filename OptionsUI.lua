@@ -58,6 +58,44 @@ local function CreateButton(parent, label, width, height, onClick)
     return btn
 end
 
+local function CreateSlider(parent, label, minVal, maxVal, step, getVal, setVal)
+    local slider = CreateFrame("Slider", nil, parent, "OptionsSliderTemplate")
+    slider:SetWidth(180)
+    slider:SetHeight(16)
+    slider:SetMinMaxValues(minVal, maxVal)
+    slider:SetValueStep(step)
+    if slider.SetObeyStepOnDrag then
+        slider:SetObeyStepOnDrag(true)
+    end
+
+    local title = slider:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    title:SetPoint("BOTTOMLEFT", slider, "TOPLEFT", 0, 4)
+    title:SetText(label)
+    slider.title = title
+
+    local valText = slider:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    valText:SetPoint("LEFT", slider, "RIGHT", 14, 0)
+    slider.valText = valText
+
+    local function UpdateDisplay(val)
+        valText:SetText(string.format("%.0f%%", val * 100))
+    end
+
+    slider:SetScript("OnShow", function(self)
+        local val = getVal() or 1.0
+        self:SetValue(val)
+        UpdateDisplay(val)
+    end)
+
+    slider:SetScript("OnValueChanged", function(self, value)
+        local rounded = math.floor((value / step) + 0.5) * step
+        UpdateDisplay(rounded)
+        setVal(rounded)
+    end)
+
+    return slider
+end
+
 -------------------------------------------------------------------------------
 -- Standalone Options Window
 -------------------------------------------------------------------------------
@@ -65,7 +103,7 @@ function OptionsUI:CreateStandaloneWindow()
     if standaloneWindow then return standaloneWindow end
 
     local frame = CreateFrame("Frame", "OneMiniMapOptionsFrame", UIParent, backdropTemplate)
-    frame:SetSize(360, 360)
+    frame:SetSize(360, 420)
     frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
     frame:SetFrameStrata("DIALOG")
     frame:SetToplevel(true)
@@ -197,7 +235,18 @@ function OptionsUI:CreateStandaloneWindow()
             end
         end)
     cbCols:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, yOfs)
-    yOfs = yOfs - 34
+    yOfs = yOfs - 38
+
+    -- 8. Minimap Scale Slider
+    local sliderScale = CreateSlider(frame, "Minimap Scale", 0.6, 1.8, 0.05,
+        function() return OneMiniMapDB and OneMiniMapDB.scale or 1.0 end,
+        function(val)
+            if OneMiniMap.SetScale then
+                OneMiniMap:SetScale(val)
+            end
+        end)
+    sliderScale:SetPoint("TOPLEFT", frame, "TOPLEFT", 24, yOfs)
+    yOfs = yOfs - 36
 
     -- Action Buttons
     local btnReset = CreateButton(frame, "Reset Positions", 150, 24, function()
