@@ -103,7 +103,7 @@ function OptionsUI:CreateStandaloneWindow()
     if standaloneWindow then return standaloneWindow end
 
     local frame = CreateFrame("Frame", "OneMiniMapOptionsFrame", UIParent, backdropTemplate)
-    frame:SetSize(360, 460)
+    frame:SetSize(360, 488)
     frame:SetFrameStrata("DIALOG")
     frame:SetToplevel(true)
     frame:SetClampedToScreen(true)
@@ -218,13 +218,33 @@ function OptionsUI:CreateStandaloneWindow()
     local cb24h = CreateCheckbox(frame, "Use 24-Hour Clock Format", 
         function() return OneMiniMapDB and OneMiniMapDB.use24h end,
         function(val)
-            OneMiniMapDB.use24h = val
-            if OneMiniMap.UpdateClock then OneMiniMap:UpdateClock() end
+            if OneMiniMap.Set24Hour then
+                OneMiniMap:Set24Hour(val)
+            else
+                OneMiniMapDB.use24h = val
+                if OneMiniMap.UpdateClock then OneMiniMap:UpdateClock() end
+            end
         end)
     cb24h:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, yOfs)
     yOfs = yOfs - spacing
 
-    -- 6. Show Button Collector Bar
+    -- 6. Local vs Server Time
+    local cbServerTime = CreateCheckbox(frame, "Show Server Time (Unchecked: Local Time)", 
+        function() return OneMiniMapDB and OneMiniMapDB.useServerTime end,
+        function(val)
+            if OneMiniMap.SetServerTime then
+                OneMiniMap:SetServerTime(val)
+            else
+                OneMiniMapDB.useServerTime = val
+                if OneMiniMap.UpdateClock then OneMiniMap:UpdateClock() end
+            end
+            local mode = val and "Server Time" or "Local Time"
+            DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Clock set to " .. mode .. ".")
+        end)
+    cbServerTime:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, yOfs)
+    yOfs = yOfs - spacing
+
+    -- 7. Show Button Collector Bar
     local cbButtons = CreateCheckbox(frame, "Show Minimap Button Collector Bar", 
         function() return OneMiniMapDB and OneMiniMapDB.showButtons end,
         function(val)

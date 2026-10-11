@@ -13,13 +13,14 @@ _G.OneMiniMap = _G.OneMiniMap or addonTable
 local OneMiniMap = _G.OneMiniMap
 
 OneMiniMap.name = addonName or "OneMiniMap"
-OneMiniMap.version = "0.3.3"
+OneMiniMap.version = "0.3.8"
 OneMiniMap.isInitialized = false
 
 -- Default Database Configuration
 local defaultDB = {
     locked = false,
     use24h = false,
+    useServerTime = false,
     showTitle = true,
     showClock = true,
     showCoords = true,
@@ -558,13 +559,23 @@ function OneMiniMap:CreateClockFrame()
     text:SetText("00:00")
     self.clockText = text
 
-    -- Left-click: Toggle 12h / 24h format
+    -- Clicks: Left-Click toggles 12h/24h (or Shift-Click opens Time Manager), Right-Click toggles Local/Server time
+    frame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     frame:SetScript("OnClick", function(self, button)
-        if button == "LeftButton" then
-            OneMiniMapDB.use24h = not OneMiniMapDB.use24h
-            OneMiniMap:UpdateClock()
-            local mode = OneMiniMapDB.use24h and "24-hour" or "12-hour"
-            DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Clock set to " .. mode .. " mode.")
+        if button == "RightButton" then
+            local newMode = not OneMiniMapDB.useServerTime
+            OneMiniMap:SetServerTime(newMode)
+            local modeStr = newMode and "Server Time" or "Local Time"
+            DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Clock set to " .. modeStr .. ".")
+        else
+            if IsShiftKeyDown and IsShiftKeyDown() and ToggleTimeManager then
+                ToggleTimeManager()
+            else
+                local new24 = not OneMiniMapDB.use24h
+                OneMiniMap:Set24Hour(new24)
+                local modeStr = new24 and "24-hour" or "12-hour"
+                DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Clock set to " .. modeStr .. " mode.")
+            end
         end
     end)
 
@@ -572,8 +583,44 @@ function OneMiniMap:CreateClockFrame()
     frame:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
         GameTooltip:ClearLines()
-        GameTooltip:AddLine("Clock", 1, 1, 1)
-        GameTooltip:AddLine("|cff00ccffClick|r to toggle 12h/24h format", 0.7, 0.7, 0.7)
+        GameTooltip:AddLine(TIMEMANAGER_TOOLTIP_TITLE or "Clock", 1, 1, 1)
+
+        local fmtTime = function(h, m)
+            if OneMiniMapDB.use24h then
+                return string.format("%02d:%02d", h, m)
+            else
+                local suffix = (h >= 12) and "PM" or "AM"
+                local h12 = h % 12
+                if h12 == 0 then h12 = 12 end
+                return string.format("%d:%02d %s", h12, m, suffix)
+            end
+        end
+
+        local d = date("*t")
+        local localH, localM = d.hour, d.min
+        local srvH, srvM
+        if GetGameTime then
+            srvH, srvM = GetGameTime()
+        end
+        if not srvH or not srvM then
+            srvH, srvM = localH, localM
+        end
+
+        local isServer = OneMiniMapDB.useServerTime
+        local localTag = isServer and "" or " |cff20ff20(Active)|r"
+        local serverTag = isServer and " |cff20ff20(Active)|r" or ""
+
+        local localLabel = TIMEMANAGER_TOOLTIP_LOCALTIME or "Local Time:"
+        local serverLabel = TIMEMANAGER_TOOLTIP_REALMTIME or "Server Time:"
+
+        GameTooltip:AddDoubleLine(localLabel, fmtTime(localH, localM) .. localTag, 1, 1, 1, 0.9, 0.9, 0.9)
+        GameTooltip:AddDoubleLine(serverLabel, fmtTime(srvH, srvM) .. serverTag, 1, 1, 1, 0.9, 0.9, 0.9)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("|cff00ccffLeft-Click|r: Toggle 12h / 24h format", 0.7, 0.7, 0.7)
+        GameTooltip:AddLine("|cff00ccffRight-Click|r: Toggle Local / Server time", 0.7, 0.7, 0.7)
+        if ToggleTimeManager then
+            GameTooltip:AddLine("|cff00ccffShift-Click|r: Open Game Time Manager", 0.7, 0.7, 0.7)
+        end
         if not OneMiniMapDB.locked then
             GameTooltip:AddLine("|cff00ccffDrag|r to reposition Clock", 0.7, 0.7, 0.7)
         end
@@ -664,15 +711,37 @@ function OneMiniMap:CreateCoordFrame()
 end
 
 -------------------------------------------------------------------------------
+-- Helper: Clock & Time Settings (Blizzard CVar Sync)
+-------------------------------------------------------------------------------
+function OneMiniMap:SetServerTime(useServer)
+    OneMiniMapDB = OneMiniMapDB or {}
+    OneMiniMapDB.useServerTime = useServer and true or false
+    if SetCVar and GetCVar and GetCVar("timeMgrUseLocalTime") ~= nil then
+        pcall(SetCVar, "timeMgrUseLocalTime", OneMiniMapDB.useServerTime and "0" or "1")
+    end
+    self:UpdateClock()
+end
+
+function OneMiniMap:Set24Hour(use24h)
+    OneMiniMapDB = OneMiniMapDB or {}
+    OneMiniMapDB.use24h = use24h and true or false
+    if SetCVar and GetCVar and GetCVar("timeMgrUseMilitaryTime") ~= nil then
+        pcall(SetCVar, "timeMgrUseMilitaryTime", OneMiniMapDB.use24h and "1" or "0")
+    end
+    self:UpdateClock()
+end
+
+-------------------------------------------------------------------------------
 -- Update Routines (Clock, Coordinates, Zone)
 -------------------------------------------------------------------------------
 function OneMiniMap:UpdateClock()
     if not self.clockText then return end
 
     local hours, minutes
-    if GetGameTime then
+    if OneMiniMapDB.useServerTime and GetGameTime then
         hours, minutes = GetGameTime()
-    else
+    end
+    if not hours or not minutes then
         local d = date("*t")
         hours, minutes = d.hour, d.min
     end
@@ -850,7 +919,13 @@ function OneMiniMap:Initialize()
     OneMiniMapDB = OneMiniMapDB or {}
     for k, v in pairs(defaultDB) do
         if OneMiniMapDB[k] == nil then
-            OneMiniMapDB[k] = v
+            if k == "useServerTime" and GetCVar and GetCVar("timeMgrUseLocalTime") ~= nil then
+                OneMiniMapDB.useServerTime = (GetCVar("timeMgrUseLocalTime") == "0")
+            elseif k == "use24h" and GetCVar and GetCVar("timeMgrUseMilitaryTime") ~= nil then
+                OneMiniMapDB.use24h = (GetCVar("timeMgrUseMilitaryTime") == "1")
+            else
+                OneMiniMapDB[k] = v
+            end
         end
     end
 
@@ -933,6 +1008,11 @@ SlashCmdList["ONEMINIMAP"] = function(msg)
             OneMiniMap.clockFrame:SetShown(OneMiniMapDB.showClock)
         end
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Clock frame toggled " .. (OneMiniMapDB.showClock and "|cff20ff20ON|r" or "|cffff2020OFF|r") .. ".")
+    elseif cmd == "time" or cmd == "servertime" or cmd == "localtime" then
+        local newMode = not OneMiniMapDB.useServerTime
+        OneMiniMap:SetServerTime(newMode)
+        local modeStr = newMode and "Server Time" or "Local Time"
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Clock set to " .. modeStr .. ".")
     elseif cmd == "title" then
         OneMiniMapDB.showTitle = not OneMiniMapDB.showTitle
         if OneMiniMap.titleFrame then
@@ -988,6 +1068,7 @@ SlashCmdList["ONEMINIMAP"] = function(msg)
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm unlock|r - Unlock all frames for dragging")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm title|r - Toggle title bar frame")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm clock|r - Toggle clock frame")
+        DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm time|r - Toggle Local vs Server time")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm coords|r - Toggle coordinates frame")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm buttons|r - Toggle button collector frame")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm page1|r - Reset action bar back to Page 1")
@@ -1006,6 +1087,7 @@ eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 eventFrame:RegisterEvent("ZONE_CHANGED")
 eventFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 eventFrame:RegisterEvent("ZONE_CHANGED_INDOORS")
+eventFrame:RegisterEvent("CVAR_UPDATE")
 
 eventFrame:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 == "OneMiniMap" then
@@ -1019,6 +1101,24 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
             ProtectActionBars()
             if OneMiniMap.ButtonCollector and OneMiniMap.ButtonCollector.Update then
                 OneMiniMap.ButtonCollector:Update()
+            end
+        end
+    elseif event == "CVAR_UPDATE" then
+        if arg1 == "timeMgrUseLocalTime" or arg1 == "TIME_MGR_USE_LOCAL_TIME" then
+            if GetCVar then
+                local val = GetCVar("timeMgrUseLocalTime")
+                if val ~= nil then
+                    OneMiniMapDB.useServerTime = (val == "0")
+                    OneMiniMap:UpdateClock()
+                end
+            end
+        elseif arg1 == "timeMgrUseMilitaryTime" or arg1 == "TIME_MGR_USE_MILITARY_TIME" then
+            if GetCVar then
+                local val = GetCVar("timeMgrUseMilitaryTime")
+                if val ~= nil then
+                    OneMiniMapDB.use24h = (val == "1")
+                    OneMiniMap:UpdateClock()
+                end
             end
         end
     elseif event:find("ZONE_CHANGED") then
