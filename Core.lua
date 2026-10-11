@@ -750,6 +750,11 @@ function OneMiniMap:RestorePositions()
     if self.ButtonCollector and self.ButtonCollector.RestorePosition then
         self.ButtonCollector:RestorePosition()
     end
+
+    -- 6. Options Window
+    if self.OptionsUI and self.OptionsUI.RestorePosition then
+        self.OptionsUI:RestorePosition()
+    end
 end
 
 -------------------------------------------------------------------------------
@@ -914,9 +919,13 @@ SlashCmdList["ONEMINIMAP"] = function(msg)
         OneMiniMapDB.clockPosition = nil
         OneMiniMapDB.coordPosition = nil
         OneMiniMapDB.buttonCollectorPosition = nil
+        OneMiniMapDB.optionsPosition = nil
         OneMiniMap:RestorePositions()
         if OneMiniMap.ButtonCollector and OneMiniMap.ButtonCollector.Update then
             OneMiniMap.ButtonCollector:Update()
+        end
+        if OneMiniMap.OptionsUI and OneMiniMap.OptionsUI.RestorePosition then
+            OneMiniMap.OptionsUI:RestorePosition()
         end
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: All positions reset to defaults.")
     elseif cmd == "scale" and tonumber(arg) then

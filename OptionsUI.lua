@@ -104,15 +104,26 @@ function OptionsUI:CreateStandaloneWindow()
 
     local frame = CreateFrame("Frame", "OneMiniMapOptionsFrame", UIParent, backdropTemplate)
     frame:SetSize(360, 420)
-    frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
     frame:SetFrameStrata("DIALOG")
     frame:SetToplevel(true)
     frame:SetClampedToScreen(true)
     frame:SetMovable(true)
     frame:EnableMouse(true)
     frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", frame.StartMoving)
-    frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+    frame:SetScript("OnDragStart", function(self)
+        self:StartMoving()
+    end)
+    frame:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        local point, _, relPoint, xOfs, yOfs = self:GetPoint()
+        OneMiniMapDB = OneMiniMapDB or {}
+        OneMiniMapDB.optionsPosition = {
+            point = point or "TOPLEFT",
+            relPoint = relPoint or "TOPLEFT",
+            x = math.floor((xOfs or 0) + 0.5),
+            y = math.floor((yOfs or 0) + 0.5),
+        }
+    end)
     frame:Hide()
 
     -- Metal Frame Styling (OneSuite signature)
@@ -255,10 +266,12 @@ function OptionsUI:CreateStandaloneWindow()
         OneMiniMapDB.clockPosition = nil
         OneMiniMapDB.coordPosition = nil
         OneMiniMapDB.buttonCollectorPosition = nil
+        OneMiniMapDB.optionsPosition = nil
         OneMiniMap:RestorePositions()
         if OneMiniMap.ButtonCollector and OneMiniMap.ButtonCollector.Update then
             OneMiniMap.ButtonCollector:Update()
         end
+        OptionsUI:RestorePosition()
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: All frame positions reset to defaults.")
     end)
     btnReset:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, yOfs)
@@ -277,6 +290,7 @@ function OptionsUI:CreateStandaloneWindow()
     end
 
     standaloneWindow = frame
+    self:RestorePosition()
     return frame
 end
 
@@ -324,10 +338,32 @@ function OptionsUI:RegisterBlizzardPanel()
 end
 
 -------------------------------------------------------------------------------
+-- Position Restore
+-------------------------------------------------------------------------------
+function OptionsUI:RestorePosition()
+    if not standaloneWindow then return end
+
+    standaloneWindow:ClearAllPoints()
+    if OneMiniMapDB and OneMiniMapDB.optionsPosition then
+        local pos = OneMiniMapDB.optionsPosition
+        standaloneWindow:SetPoint(pos.point or "TOPRIGHT", UIParent, pos.relPoint or "TOPRIGHT", pos.x or -25, pos.y or -20)
+    else
+        -- Default: opens directly above the default position of Clock and Coords
+        local anchorFrame = (OneMiniMap and OneMiniMap.coordFrame) or (OneMiniMap and OneMiniMap.titleFrame) or (OneMiniMap and OneMiniMap.mapFrame)
+        if anchorFrame then
+            standaloneWindow:SetPoint("BOTTOMRIGHT", anchorFrame, "TOPRIGHT", 0, 8)
+        else
+            standaloneWindow:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -25, -20)
+        end
+    end
+end
+
+-------------------------------------------------------------------------------
 -- Public API
 -------------------------------------------------------------------------------
 function OptionsUI:Show()
     local win = self:CreateStandaloneWindow()
+    self:RestorePosition()
     win:Show()
 end
 
@@ -342,6 +378,7 @@ function OptionsUI:Toggle()
     if win:IsShown() then
         win:Hide()
     else
+        self:RestorePosition()
         win:Show()
     end
 end
