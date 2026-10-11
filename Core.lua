@@ -380,32 +380,71 @@ function OneMiniMap:CreateMapFrame()
         OneMiniMap:SaveMapPosition()
     end)
 
-    -- Allow clicking anywhere on Minimap to drag when unlocked
+    -- Capture original Minimap click / mouseup handler (for pings)
+    local orig_Minimap_OnMouseUp = Minimap:GetScript("OnMouseUp")
+    local isDraggingMap = false
+
+    local function PingMinimap(mapSelf)
+        local x, y = GetCursorPosition()
+        local scale = mapSelf:GetEffectiveScale()
+        if scale and scale > 0 then
+            x = x / scale
+            y = y / scale
+        end
+        local cx, cy = mapSelf:GetCenter()
+        if not cx or not cy then return end
+
+        local ox = CURSOR_OFFSET_X or 0
+        local oy = CURSOR_OFFSET_Y or 0
+        x = x + ox - cx
+        y = y + oy - cy
+
+        -- Square minimap boundary check
+        local halfW = (mapSelf:GetWidth() or 210) / 2
+        local halfH = (mapSelf:GetHeight() or 210) / 2
+        if math.abs(x) <= halfW and math.abs(y) <= halfH then
+            if mapSelf.PingLocation then
+                mapSelf:PingLocation(x, y)
+            elseif Minimap.PingLocation then
+                Minimap:PingLocation(x, y)
+            elseif orig_Minimap_OnMouseUp then
+                orig_Minimap_OnMouseUp(mapSelf, "LeftButton")
+            elseif Minimap_OnClick then
+                Minimap_OnClick(mapSelf)
+            end
+        end
+    end
+
+    -- Allow dragging anywhere on Minimap when unlocked, pinging on stationary left-click
     Minimap:EnableMouse(true)
     Minimap:RegisterForDrag("LeftButton")
     Minimap:SetScript("OnDragStart", function(self)
         if not OneMiniMapDB.locked then
             frame:StartMoving()
-            frame.isMoving = true
+            isDraggingMap = true
         end
     end)
     Minimap:SetScript("OnDragStop", function(self)
-        frame:StopMovingOrSizing()
-        frame.isMoving = false
-        OneMiniMap:SaveMapPosition()
+        if isDraggingMap then
+            frame:StopMovingOrSizing()
+            isDraggingMap = false
+            OneMiniMap:SaveMapPosition()
+        end
     end)
 
     Minimap:SetScript("OnMouseDown", function(self, button)
-        if button == "LeftButton" and not OneMiniMapDB.locked then
-            frame:StartMoving()
-            frame.isMoving = true
-        end
+        isDraggingMap = false
     end)
     Minimap:SetScript("OnMouseUp", function(self, button)
-        if button == "LeftButton" and frame.isMoving then
-            frame:StopMovingOrSizing()
-            frame.isMoving = false
-            OneMiniMap:SaveMapPosition()
+        if button == "LeftButton" then
+            if isDraggingMap then
+                frame:StopMovingOrSizing()
+                isDraggingMap = false
+                OneMiniMap:SaveMapPosition()
+            else
+                -- Stationary click: drop map ping at clicked coordinates!
+                PingMinimap(self)
+            end
         end
     end)
 
