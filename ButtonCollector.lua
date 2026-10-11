@@ -110,7 +110,128 @@ function BC:CreateOptionsButton()
 end
 
 -------------------------------------------------------------------------------
--- 2. Button Collector Container Frame
+-- 2. Button Collector Growth & Drag Preview Helpers
+-------------------------------------------------------------------------------
+BC.previewSlots = {}
+
+function BC:GetGrowthDirection()
+    if not self.frame then return "LEFT" end
+    local mapFrame = OneMiniMap and OneMiniMap.mapFrame
+    if mapFrame and mapFrame.GetLeft and self.frame.GetRight then
+        local mLeft = mapFrame:GetLeft()
+        local bcRight = self.frame:GetRight()
+        if mLeft and bcRight and bcRight <= (mLeft + 25) then
+            return "LEFT"
+        end
+        local mRight = mapFrame:GetRight()
+        local bcLeft = self.frame:GetLeft()
+        if mRight and bcLeft and bcLeft >= (mRight - 25) then
+            return "RIGHT"
+        end
+    end
+
+    -- Fallback based on screen center
+    if self.frame.GetLeft and UIParent and UIParent.GetWidth then
+        local bcLeft = self.frame:GetLeft()
+        local screenW = UIParent:GetWidth()
+        if bcLeft and screenW and bcLeft > (screenW / 2) then
+            return "LEFT"
+        end
+    end
+
+    return "RIGHT"
+end
+
+function BC:ShowDragPreview()
+    if not self.frame then return end
+
+    local buttonSize = 26
+    local spacing = 3
+    local padding = 3
+    local headerHeight = 14
+    local maxRows = 8
+
+    local totalButtons = #(self.buttons or {})
+    local cols = math.ceil(math.max(totalButtons, 1) / maxRows)
+    if cols < 1 then cols = 1 end
+
+    local totalSlots = cols * maxRows
+    local totalWidth = (cols * buttonSize) + ((cols - 1) * spacing) + (padding * 2)
+    local fullHeight = headerHeight + (maxRows * buttonSize) + ((maxRows - 1) * spacing) + (padding * 2)
+
+    self.frame:SetSize(totalWidth, fullHeight)
+
+    local growthDir = self:GetGrowthDirection()
+
+    for i = 1, totalSlots do
+        local isOccupied = (i <= totalButtons)
+        local colIdx = math.floor((i - 1) / maxRows)
+        local rowIdx = (i - 1) % maxRows
+
+        local yOfs = -headerHeight - padding - (rowIdx * (buttonSize + spacing))
+        local xOfs
+        if growthDir == "LEFT" then
+            xOfs = totalWidth - padding - buttonSize - (colIdx * (buttonSize + spacing))
+        else
+            xOfs = padding + (colIdx * (buttonSize + spacing))
+        end
+
+        local slot = self.previewSlots[i]
+        if not slot then
+            slot = CreateFrame("Frame", nil, self.frame)
+            slot:SetSize(buttonSize, buttonSize)
+
+            local bg = slot:CreateTexture(nil, "BACKGROUND")
+            bg:SetAllPoints(slot)
+            if bg.SetColorTexture then
+                bg:SetColorTexture(0.18, 0.18, 0.18, 0.40)
+            else
+                bg:SetTexture("Interface\\Buttons\\WHITE8X8")
+                bg:SetVertexColor(0.18, 0.18, 0.18, 0.40)
+            end
+
+            local border = slot:CreateTexture(nil, "OVERLAY")
+            border:SetPoint("TOPLEFT", slot, "TOPLEFT", 1, -1)
+            border:SetPoint("BOTTOMRIGHT", slot, "BOTTOMRIGHT", -1, 1)
+            if border.SetColorTexture then
+                border:SetColorTexture(0.55, 0.55, 0.55, 0.35)
+            end
+
+            local text = slot:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+            text:SetPoint("CENTER", slot, "CENTER", 0, 0)
+            text:SetText("+")
+            if text.SetTextColor then
+                text:SetTextColor(0.6, 0.6, 0.6, 0.5)
+            end
+
+            slot.bg = bg
+            slot.border = border
+            slot.text = text
+            self.previewSlots[i] = slot
+        end
+
+        slot:ClearAllPoints()
+        slot:SetPoint("TOPLEFT", self.frame, "TOPLEFT", xOfs, yOfs)
+
+        if isOccupied then
+            slot:Hide()
+        else
+            slot:Show()
+        end
+    end
+end
+
+function BC:HideDragPreview()
+    if self.previewSlots then
+        for _, slot in pairs(self.previewSlots) do
+            slot:Hide()
+        end
+    end
+    self:Update()
+end
+
+-------------------------------------------------------------------------------
+-- 3. Button Collector Container Frame
 -------------------------------------------------------------------------------
 function BC:CreateFrame()
     if self.frame then return self.frame end
@@ -140,11 +261,13 @@ function BC:CreateFrame()
     -- Dragging Helpers
     local function StartMoving()
         if not OneMiniMapDB or not OneMiniMapDB.locked then
+            BC:ShowDragPreview()
             frame:StartMoving()
         end
     end
     local function StopMoving()
         frame:StopMovingOrSizing()
+        BC:HideDragPreview()
         if OneMiniMapDB then
             local point, _, relPoint, xOfs, yOfs = frame:GetPoint()
             OneMiniMapDB.buttonCollectorPosition = {
@@ -443,16 +566,26 @@ function BC:Update()
 
     self.buttons = collected
 
-    -- Layout in vertical column(s)
+    -- Layout in vertical column(s) with max 8 rows per column
     local buttonSize = 26
     local iconSize = 20
     local spacing = 3
     local padding = 3
     local headerHeight = 14
-    local cols = (OneMiniMapDB and OneMiniMapDB.buttonCols) or 1
+    local maxRows = 8
     local totalButtons = #collected
 
-    local rows = math.ceil(totalButtons / cols)
+    -- Add a column for buttons > 8 (or if user forced 2 cols in options)
+    local userCols = OneMiniMapDB and OneMiniMapDB.buttonCols
+    local cols
+    if userCols and userCols > 1 then
+        cols = userCols
+    else
+        cols = math.ceil(totalButtons / maxRows)
+        if cols < 1 then cols = 1 end
+    end
+
+    local rows = math.min(maxRows, totalButtons)
     if rows < 1 then rows = 1 end
 
     local totalWidth = (cols * buttonSize) + ((cols - 1) * spacing) + (padding * 2)
@@ -460,12 +593,19 @@ function BC:Update()
 
     self.frame:SetSize(totalWidth, totalHeight)
 
-    for i, btn in ipairs(collected) do
-        local col = (i - 1) % cols
-        local row = math.floor((i - 1) / cols)
+    local growthDir = self:GetGrowthDirection()
 
-        local xOfs = padding + (col * (buttonSize + spacing))
-        local yOfs = -headerHeight - padding - (row * (buttonSize + spacing))
+    for i, btn in ipairs(collected) do
+        local colIdx = math.floor((i - 1) / maxRows)
+        local rowIdx = (i - 1) % maxRows
+
+        local yOfs = -headerHeight - padding - (rowIdx * (buttonSize + spacing))
+        local xOfs
+        if growthDir == "LEFT" then
+            xOfs = totalWidth - padding - buttonSize - (colIdx * (buttonSize + spacing))
+        else
+            xOfs = padding + (colIdx * (buttonSize + spacing))
+        end
 
         btn:SetParent(self.frame)
         btn:ClearAllPoints()
