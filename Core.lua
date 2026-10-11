@@ -13,7 +13,7 @@ _G.OneMiniMap = _G.OneMiniMap or addonTable
 local OneMiniMap = _G.OneMiniMap
 
 OneMiniMap.name = addonName or "OneMiniMap"
-OneMiniMap.version = "0.3.0"
+OneMiniMap.version = "0.3.1"
 OneMiniMap.isInitialized = false
 
 -- Default Database Configuration
@@ -112,11 +112,26 @@ local function CreateTranslucentBackground(parent, alpha)
 end
 
 -------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 -- Direct Minimap Zoom Handling (Wheel & Clicks)
 -------------------------------------------------------------------------------
+local function UpdateZoomButtonStates()
+    if not Minimap or not Minimap.GetZoom then return end
+    local curr = Minimap:GetZoom() or 0
+    local maxZoom = (Minimap.GetZoomLevels and Minimap:GetZoomLevels() - 1) or 5
+    local zIn = (Minimap and Minimap.ZoomIn) or _G["MinimapZoomIn"]
+    local zOut = (Minimap and Minimap.ZoomOut) or _G["MinimapZoomOut"]
+    if zIn and zIn.Enable and zIn.Disable then
+        if curr >= maxZoom then zIn:Disable() else zIn:Enable() end
+    end
+    if zOut and zOut.Enable and zOut.Disable then
+        if curr <= 0 then zOut:Disable() else zOut:Enable() end
+    end
+end
+
 local function DoZoom(delta)
     if not Minimap or not Minimap.GetZoom then return end
-    local curr = Minimap:GetZoom()
+    local curr = Minimap:GetZoom() or 0
     local maxZoom = (Minimap.GetZoomLevels and Minimap:GetZoomLevels() - 1) or 5
 
     if delta > 0 then
@@ -128,6 +143,7 @@ local function DoZoom(delta)
             Minimap:SetZoom(curr - 1)
         end
     end
+    UpdateZoomButtonStates()
 end
 
 local function SetupZoomHandling()
@@ -136,13 +152,30 @@ local function SetupZoomHandling()
         DoZoom(delta)
     end)
 
-    -- Hook native +/- buttons if they appear on mouseover
-    if MinimapZoomIn then
-        MinimapZoomIn:SetScript("OnClick", function() DoZoom(1) end)
+    if OneMiniMap.mapFrame then
+        OneMiniMap.mapFrame:EnableMouseWheel(true)
+        OneMiniMap.mapFrame:SetScript("OnMouseWheel", function(self, delta)
+            DoZoom(delta)
+        end)
     end
-    if MinimapZoomOut then
-        MinimapZoomOut:SetScript("OnClick", function() DoZoom(-1) end)
+
+    -- Hook native +/- buttons (both modern Minimap.ZoomIn and legacy MinimapZoomIn)
+    local zIn = (Minimap and Minimap.ZoomIn) or _G["MinimapZoomIn"]
+    if zIn then
+        zIn:SetScript("OnClick", function() DoZoom(1) end)
     end
+    local zOut = (Minimap and Minimap.ZoomOut) or _G["MinimapZoomOut"]
+    if zOut then
+        zOut:SetScript("OnClick", function() DoZoom(-1) end)
+    end
+
+    -- Global zoom function overrides
+    Minimap_ZoomIn = function() DoZoom(1) end
+    Minimap_ZoomOut = function() DoZoom(-1) end
+    Minimap_ZoomInClick = function() DoZoom(1) end
+    Minimap_ZoomOutClick = function() DoZoom(-1) end
+
+    UpdateZoomButtonStates()
 end
 
 -------------------------------------------------------------------------------
@@ -236,7 +269,18 @@ local function SuppressBlizzardChrome()
         pcall(function()
             for _, region in ipairs({ MinimapCluster:GetRegions() }) do KillObject(region) end
             for _, child in ipairs({ MinimapCluster:GetChildren() }) do
-                if child ~= Minimap and child ~= MiniMapTrackingFrame and child ~= MiniMapMailFrame and child ~= GameTimeFrame then
+                local cname = (child.GetName and child:GetName()) or ""
+                local isEssential = (child == Minimap)
+                    or (child == MiniMapTrackingFrame)
+                    or (child == _G["MiniMapTracking"])
+                    or (MinimapCluster.Tracking and child == MinimapCluster.Tracking)
+                    or (child == MiniMapMailFrame)
+                    or (MinimapCluster.IndicatorFrame and child == MinimapCluster.IndicatorFrame)
+                    or (child == GameTimeFrame)
+                    or (child == _G["QueueStatusMinimapButton"])
+                    or (cname:find("Zoom") ~= nil)
+                    or (cname:find("^OneMiniMap") ~= nil)
+                if not isEssential then
                     KillObject(child)
                 end
             end
@@ -458,7 +502,7 @@ function OneMiniMap:CreateClockFrame()
     if self.clockFrame then return self.clockFrame end
 
     local frame = CreateFrame("Button", "OneMiniMapClockFrame", UIParent)
-    frame:SetSize(70, 20)
+    frame:SetSize(74, 20)
     frame:SetClampedToScreen(true)
     frame:SetMovable(true)
     frame:SetFrameStrata("MEDIUM")
@@ -528,7 +572,7 @@ function OneMiniMap:CreateCoordFrame()
     if self.coordFrame then return self.coordFrame end
 
     local frame = CreateFrame("Button", "OneMiniMapCoordFrame", UIParent)
-    frame:SetSize(84, 20)
+    frame:SetSize(74, 20)
     frame:SetClampedToScreen(true)
     frame:SetMovable(true)
     frame:SetFrameStrata("MEDIUM")
@@ -666,13 +710,13 @@ function OneMiniMap:SaveMapPosition()
 end
 
 function OneMiniMap:RestorePositions()
-    -- 1. Map Frame: Default TOPRIGHT of screen (-25, -50)
+    -- 1. Map Frame: Default TOPRIGHT of screen (-25, -60)
     self.mapFrame:ClearAllPoints()
     if OneMiniMapDB.mapPosition then
         local pos = OneMiniMapDB.mapPosition
-        self.mapFrame:SetPoint(pos.point or "TOPRIGHT", UIParent, pos.relPoint or "TOPRIGHT", pos.x or -25, pos.y or -50)
+        self.mapFrame:SetPoint(pos.point or "TOPRIGHT", UIParent, pos.relPoint or "TOPRIGHT", pos.x or -25, pos.y or -60)
     else
-        self.mapFrame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -25, -50)
+        self.mapFrame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -25, -60)
     end
 
     -- 2. Title Frame: Attached directly above Map Frame unless independently moved
@@ -684,22 +728,22 @@ function OneMiniMap:RestorePositions()
         self.titleFrame:SetPoint("BOTTOM", self.mapFrame, "TOP", 0, 4)
     end
 
-    -- 3. Clock Frame: Attached below Map Frame on the Left unless independently moved
+    -- 3. Clock Frame: Attached above Title Frame on the Left unless independently moved
     self.clockFrame:ClearAllPoints()
     if OneMiniMapDB.clockPosition then
         local pos = OneMiniMapDB.clockPosition
         self.clockFrame:SetPoint(pos.point or "TOPRIGHT", UIParent, pos.relPoint or "TOPRIGHT", pos.x, pos.y)
     else
-        self.clockFrame:SetPoint("TOPLEFT", self.mapFrame, "BOTTOMLEFT", 0, -4)
+        self.clockFrame:SetPoint("BOTTOMLEFT", self.titleFrame, "TOPLEFT", 0, 4)
     end
 
-    -- 4. Coordinates Frame: Attached below Map Frame on the Right unless independently moved
+    -- 4. Coordinates Frame: Attached above Title Frame on the Right unless independently moved
     self.coordFrame:ClearAllPoints()
     if OneMiniMapDB.coordPosition then
         local pos = OneMiniMapDB.coordPosition
         self.coordFrame:SetPoint(pos.point or "TOPRIGHT", UIParent, pos.relPoint or "TOPRIGHT", pos.x, pos.y)
     else
-        self.coordFrame:SetPoint("TOPRIGHT", self.mapFrame, "BOTTOMRIGHT", 0, -4)
+        self.coordFrame:SetPoint("BOTTOMRIGHT", self.titleFrame, "TOPRIGHT", 0, 4)
     end
 
     -- 5. Button Collector
@@ -760,9 +804,17 @@ function OneMiniMap:Initialize()
     self:CreateClockFrame()
     self:CreateCoordFrame()
 
+    -- Ensure Zoom Handling is fully wired to Map Frame
+    SetupZoomHandling()
+
     -- Initialize Button Collector
     if self.ButtonCollector and self.ButtonCollector.Initialize then
         self.ButtonCollector:Initialize()
+    end
+
+    -- Initialize Options UI
+    if self.OptionsUI and self.OptionsUI.Initialize then
+        self.OptionsUI:Initialize()
     end
 
     -- Restore Independent Positions
@@ -801,8 +853,15 @@ SLASH_ONEMINIMAP2 = "/omm"
 SlashCmdList["ONEMINIMAP"] = function(msg)
     msg = (msg or ""):lower():match("^%s*(.-)%s*$")
     local cmd, arg = msg:match("^(%S+)%s*(.*)$")
+    cmd = cmd or ""
 
-    if cmd == "lock" then
+    if cmd == "" or cmd == "options" or cmd == "opt" or cmd == "config" or cmd == "ui" then
+        if OneMiniMap.ToggleOptions then
+            OneMiniMap:ToggleOptions()
+        else
+            DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Type |cffffd200/omm help|r for command list.")
+        end
+    elseif cmd == "lock" then
         OneMiniMapDB.locked = true
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Frames are now |cffff2020LOCKED|r.")
     elseif cmd == "unlock" then

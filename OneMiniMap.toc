@@ -2,9 +2,11 @@
 ## Title: OneMiniMap
 ## Notes: Modular Square MiniMap with metal frame styling, frameless translucent title bar, draggable clock, draggable coordinates, and button collector.
 ## Author: Antigravity
-## Version: 0.3.0
+## Version: 0.3.1
+## IconTexture: Interface\Icons\INV_Misc_Compass_01
 ## SavedVariables: OneMiniMapDB
 ## OptionalDeps: OnePanelUtils, OneSwatter
 
 Core.lua
 ButtonCollector.lua
+OptionsUI.lua
