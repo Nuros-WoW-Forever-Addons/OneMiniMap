@@ -13,7 +13,7 @@ _G.OneMiniMap = _G.OneMiniMap or addonTable
 local OneMiniMap = _G.OneMiniMap
 
 OneMiniMap.name = addonName or "OneMiniMap"
-OneMiniMap.version = "0.3.8"
+OneMiniMap.version = "0.3.9"
 OneMiniMap.isInitialized = false
 
 -- Default Database Configuration
@@ -201,6 +201,8 @@ end
 -------------------------------------------------------------------------------
 local hiddenFrame = CreateFrame("Frame")
 hiddenFrame:Hide()
+hiddenFrame.Layout = function() end
+hiddenFrame.MarkDirty = function() end
 
 local function KillObject(obj)
     if not obj then return end
@@ -289,6 +291,12 @@ local function SuppressBlizzardChrome()
             MinimapCluster:EnableMouse(false)
             MinimapCluster:Hide()
             MinimapCluster.Show = function() end
+            if not MinimapCluster.Layout then
+                MinimapCluster.Layout = function() end
+            end
+            if MinimapCluster.IndicatorFrame and not MinimapCluster.IndicatorFrame.Layout then
+                MinimapCluster.IndicatorFrame.Layout = function() end
+            end
         end)
     end
 

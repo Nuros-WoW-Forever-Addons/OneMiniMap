@@ -540,6 +540,15 @@ function BC:Update()
     if not mailBtn and MinimapCluster and MinimapCluster.IndicatorFrame and MinimapCluster.IndicatorFrame.MailFrame then
         mailBtn = MinimapCluster.IndicatorFrame.MailFrame
     end
+    if mailBtn then
+        local p = mailBtn:GetParent()
+        if p and not p.Layout then
+            p.Layout = function() end
+        end
+        if p and not p.MarkDirty then
+            p.MarkDirty = function() end
+        end
+    end
     local hasMail = (HasNewMail and HasNewMail()) or (mailBtn and mailBtn:IsShown())
     if mailBtn and hasMail then
         AddButton(mailBtn, true)
