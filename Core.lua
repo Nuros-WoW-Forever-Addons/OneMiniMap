@@ -13,7 +13,7 @@ _G.OneMiniMap = _G.OneMiniMap or addonTable
 local OneMiniMap = _G.OneMiniMap
 
 OneMiniMap.name = addonName or "OneMiniMap"
-OneMiniMap.version = "0.5.1"
+OneMiniMap.version = "0.5.2"
 OneMiniMap.isInitialized = false
 
 -- Default Database Configuration
@@ -754,8 +754,8 @@ end
 -------------------------------------------------------------------------------
 -- Message Routing & Dedicated Chat Tab ("OneAddon")
 -------------------------------------------------------------------------------
-function OneMiniMap:GetChatFrame()
-    if OneMiniMapDB and OneMiniMapDB.routeToOneAddonTab == false then
+function OneMiniMap:EnsureChatTab()
+    if not OneMiniMapDB or OneMiniMapDB.routeToOneAddonTab == false then
         return DEFAULT_CHAT_FRAME
     end
 
@@ -766,7 +766,16 @@ function OneMiniMap:GetChatFrame()
         local name = GetChatWindowInfo(i)
         if name == targetName then
             local cf = _G["ChatFrame" .. i]
-            if cf then return cf end
+            if cf then
+                local tab = _G["ChatFrame" .. i .. "Tab"]
+                if tab then
+                    tab:Show()
+                    if PanelTemplates_TabResize then
+                        pcall(PanelTemplates_TabResize, tab, 0)
+                    end
+                end
+                return cf
+            end
         end
     end
 
@@ -774,15 +783,32 @@ function OneMiniMap:GetChatFrame()
     if FCF_OpenNewWindow then
         local frame = FCF_OpenNewWindow(targetName)
         if frame then
-            if FCF_DockFrame then
-                local numDocked = (FCF_GetNumDockedFrames and FCF_GetNumDockedFrames()) or 1
-                pcall(FCF_DockFrame, frame, numDocked + 1)
+            if FCF_DockFrame and GENERAL_CHAT_DOCK then
+                local docked = (FCFDock_GetChatFrames and FCFDock_GetChatFrames(GENERAL_CHAT_DOCK)) or (GENERAL_CHAT_DOCK and GENERAL_CHAT_DOCK.DOCKED_CHAT_FRAMES) or {}
+                local nextIdx = #docked + 1
+                pcall(FCF_DockFrame, frame, nextIdx, false)
             end
             if ChatFrame_RemoveAllMessageGroups then
                 pcall(ChatFrame_RemoveAllMessageGroups, frame)
             end
             if ChatFrame_RemoveAllChannels then
                 pcall(ChatFrame_RemoveAllChannels, frame)
+            end
+            if FCF_DockUpdate then
+                pcall(FCF_DockUpdate)
+            end
+            local id = frame.GetID and frame:GetID()
+            if id then
+                local tab = _G["ChatFrame" .. id .. "Tab"]
+                if tab then
+                    tab:Show()
+                    if PanelTemplates_TabResize then
+                        pcall(PanelTemplates_TabResize, tab, 0)
+                    end
+                end
+            end
+            if FCF_SelectDockFrame and DEFAULT_CHAT_FRAME then
+                pcall(FCF_SelectDockFrame, DEFAULT_CHAT_FRAME)
             end
             return frame
         end
@@ -791,11 +817,15 @@ function OneMiniMap:GetChatFrame()
     return DEFAULT_CHAT_FRAME or ChatFrame1
 end
 
+function OneMiniMap:GetChatFrame()
+    return self:EnsureChatTab()
+end
+
 function OneMiniMap:Print(msg, ...)
     if ... then
         msg = string.format(msg, ...)
     end
-    local targetFrame = self:GetChatFrame()
+    local targetFrame = self:EnsureChatTab() or DEFAULT_CHAT_FRAME
     if targetFrame and targetFrame.AddMessage then
         targetFrame:AddMessage(msg)
     elseif DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
@@ -1042,7 +1072,6 @@ function OneMiniMap:Initialize()
     StartUpdateTicker()
 
     self.isInitialized = true
-    self:Print("|cff00ccffOneMiniMap|r v" .. self.version .. " initialized. Type |cffffd200/omm|r for options.")
 end
 
 -------------------------------------------------------------------------------
@@ -1178,12 +1207,25 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
     elseif event == "PLAYER_LOGIN" or event == "PLAYER_ENTERING_WORLD" then
         if not OneMiniMap.isInitialized then
             OneMiniMap:Initialize()
-        else
-            SuppressBlizzardChrome()
-            SetupZoomHandling()
-            ProtectActionBars()
-            if OneMiniMap.ButtonCollector and OneMiniMap.ButtonCollector.Update then
-                OneMiniMap.ButtonCollector:Update()
+        end
+        SuppressBlizzardChrome()
+        SetupZoomHandling()
+        ProtectActionBars()
+        if OneMiniMap.ButtonCollector and OneMiniMap.ButtonCollector.Update then
+            OneMiniMap.ButtonCollector:Update()
+        end
+        if event == "PLAYER_ENTERING_WORLD" then
+            local function SetupChat()
+                OneMiniMap:EnsureChatTab()
+                if not OneMiniMap.welcomePrinted then
+                    OneMiniMap.welcomePrinted = true
+                    OneMiniMap:Print("|cff00ccffOneMiniMap|r v" .. OneMiniMap.version .. " initialized. Type |cffffd200/omm|r for options.")
+                end
+            end
+            if C_Timer and C_Timer.After then
+                C_Timer.After(0.3, SetupChat)
+            else
+                SetupChat()
             end
         end
     elseif event == "CVAR_UPDATE" then

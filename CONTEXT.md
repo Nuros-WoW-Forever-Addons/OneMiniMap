@@ -7,7 +7,7 @@
 ## 🎯 Overview & Scope
 
 - **Addon Name**: OneMiniMap
-- **Current Version**: 0.5.1
+- **Current Version**: 0.5.2
 - **Suite**: Part of the **OneSuite** family
 - **GitHub Repository**:
   - Exists: TRUE
@@ -67,6 +67,10 @@ When picking up development on this addon:
 ---
 
 ## ✅ Recent Completed Work (Latest Spins)
+
+### Spin 0.5.2
+- **Chat Tab Lifecycle & Docking Fix**: Deferred `"OneAddon"` chat tab creation to `PLAYER_ENTERING_WORLD` with a 0.3s timer, ensuring Blizzard's `FCF_UpdateChatWindows()` has completed loading chat caches from disk.
+- **Dock Calculation & Refresh**: Accurately queries `#GENERAL_CHAT_DOCK.DOCKED_CHAT_FRAMES + 1` for dock position, followed by `FCF_DockUpdate()` and `PanelTemplates_TabResize()`, so the tab displays visibly in the dock upon UI reload.
 
 ### Spin 0.5.1
 - **Dedicated "OneAddon" Chat Tab**: Implemented automatic chat tab creation and message routing (`OneMiniMapDB.routeToOneAddonTab`, default `true`).

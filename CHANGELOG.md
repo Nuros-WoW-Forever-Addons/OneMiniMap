@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.2] - 2026-11-06
+### Fixed
+- **Chat Tab Initialization Timing**: Fixed an issue where `"OneAddon"` chat tab creation ran during `ADDON_LOADED` before `GENERAL_CHAT_DOCK` and chat cache were ready, causing Blizzard's chat loader to wipe it. Tab creation now defers to `PLAYER_ENTERING_WORLD` (with a 0.3s settling timer).
+- **Dock Index Calculation**: Fixed `FCF_DockFrame` call to calculate index via `GENERAL_CHAT_DOCK.DOCKED_CHAT_FRAMES` instead of an undefined function, preventing collisions with the Combat Log.
+- **Dock Refresh & Tab Sizing**: Added explicit calls to `FCF_DockUpdate()` and `PanelTemplates_TabResize()` ensuring the newly docked tab immediately appears on the chat dock.
+
 ## [0.5.1] - 2026-11-06
 ### Added
 - **Dedicated "OneAddon" Chat Tab**: Added automatic chat tab creation and message routing (`OneMiniMapDB.routeToOneAddonTab`, defaults to `true`).
