@@ -103,7 +103,7 @@ function OptionsUI:CreateStandaloneWindow()
     if standaloneWindow then return standaloneWindow end
 
     local frame = CreateFrame("Frame", "OneMiniMapOptionsFrame", UIParent, backdropTemplate)
-    frame:SetSize(360, 516)
+    frame:SetSize(360, 548)
     frame:SetFrameStrata("DIALOG")
     frame:SetToplevel(true)
     frame:SetClampedToScreen(true)
@@ -179,7 +179,7 @@ function OptionsUI:CreateStandaloneWindow()
         function(val)
             OneMiniMapDB.locked = val
             local state = val and "|cffff2020LOCKED|r" or "|cff20ff20UNLOCKED|r"
-            DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Frames are now " .. state .. ".")
+            OneMiniMap:Print("|cff00ccffOneMiniMap|r: Frames are now " .. state .. ".")
         end)
     cbLock:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, yOfs)
     yOfs = yOfs - spacing
@@ -239,7 +239,7 @@ function OptionsUI:CreateStandaloneWindow()
                 if OneMiniMap.UpdateClock then OneMiniMap:UpdateClock() end
             end
             local mode = val and "Server Time" or "Local Time"
-            DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Clock set to " .. mode .. ".")
+            OneMiniMap:Print("|cff00ccffOneMiniMap|r: Clock set to " .. mode .. ".")
         end)
     cbServerTime:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, yOfs)
     yOfs = yOfs - spacing
@@ -283,12 +283,23 @@ function OptionsUI:CreateStandaloneWindow()
                 end
             end
             local dirStr = val and "Grow to the Left" or "Grow to the Right"
-            DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Button Collector column growth set to " .. dirStr .. ".")
+            OneMiniMap:Print("|cff00ccffOneMiniMap|r: Button Collector column growth set to " .. dirStr .. ".")
         end)
     cbGrow:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, yOfs)
+    yOfs = yOfs - spacing
+
+    -- 10. Route Messages to 'OneAddon' Chat Tab
+    local cbChatTab = CreateCheckbox(frame, "Route Addon Messages to 'OneAddon' Chat Tab", 
+        function() return OneMiniMapDB and (OneMiniMapDB.routeToOneAddonTab ~= false) end,
+        function(val)
+            OneMiniMapDB.routeToOneAddonTab = val
+            local dest = val and "'OneAddon' tab" or "General chat"
+            OneMiniMap:Print("|cff00ccffOneMiniMap|r: Addon messages routed to " .. dest .. ".")
+        end)
+    cbChatTab:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, yOfs)
     yOfs = yOfs - 38
 
-    -- 8. Minimap Scale Slider
+    -- Minimap Scale Slider
     local sliderScale = CreateSlider(frame, "Minimap Scale", 0.6, 1.8, 0.05,
         function() return OneMiniMapDB and OneMiniMapDB.scale or 1.0 end,
         function(val)
@@ -312,7 +323,7 @@ function OptionsUI:CreateStandaloneWindow()
             OneMiniMap.ButtonCollector:Update()
         end
         OptionsUI:RestorePosition()
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: All frame positions reset to defaults.")
+        OneMiniMap:Print("|cff00ccffOneMiniMap|r: All frame positions reset to defaults.")
     end)
     btnReset:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, yOfs)
 
@@ -320,7 +331,7 @@ function OptionsUI:CreateStandaloneWindow()
         if ChangeActionBarPage then
             ChangeActionBarPage(1)
         end
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Action bar reset to Page 1.")
+        OneMiniMap:Print("|cff00ccffOneMiniMap|r: Action bar reset to Page 1.")
     end)
     btnBar:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -18, yOfs)
     yOfs = yOfs - 30
@@ -331,7 +342,7 @@ function OptionsUI:CreateStandaloneWindow()
             OneMiniMap.ButtonCollector:Update()
         end
         local st = OneMiniMapDB.testMode and "|cff20ff20ON (12 buttons, 2 columns)|r" or "|cffff2020OFF|r"
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Test mode " .. st .. ".")
+        OneMiniMap:Print("|cff00ccffOneMiniMap|r: Test mode " .. st .. ".")
     end)
     btnTest:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, yOfs)
 

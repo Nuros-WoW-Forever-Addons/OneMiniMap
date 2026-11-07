@@ -80,7 +80,7 @@ function BC:CreateOptionsButton()
         if button == "RightButton" then
             OneMiniMapDB.locked = not OneMiniMapDB.locked
             local state = OneMiniMapDB.locked and "|cffff2020LOCKED|r" or "|cff20ff20UNLOCKED|r"
-            DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Frames are now " .. state .. ".")
+            OneMiniMap:Print("|cff00ccffOneMiniMap|r: Frames are now " .. state .. ".")
         else
             if OneMiniMap.ToggleOptions then
                 OneMiniMap:ToggleOptions()

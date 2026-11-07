@@ -7,7 +7,7 @@
 ## 🎯 Overview & Scope
 
 - **Addon Name**: OneMiniMap
-- **Current Version**: 0.5.0
+- **Current Version**: 0.5.1
 - **Suite**: Part of the **OneSuite** family
 - **GitHub Repository**:
   - Exists: TRUE
@@ -40,6 +40,7 @@ OneMiniMapDB = {
     showCoords = true,                 -- Show player coordinates frame
     buttonCols = 1,                    -- Number of button collector columns
     growLeft = true,                   -- Second column growth direction (true = left, false = right)
+    routeToOneAddonTab = true,         -- Route output to dedicated 'OneAddon' chat tab (false = General chat)
     scale = 1.0,                       -- Minimap scale (0.5 to 2.0)
     mapPosition = nil,                 -- Saved Minimap anchor table
     titlePosition = nil,               -- Saved Title bar anchor table
@@ -66,6 +67,14 @@ When picking up development on this addon:
 ---
 
 ## ✅ Recent Completed Work (Latest Spins)
+
+### Spin 0.5.1
+- **Dedicated "OneAddon" Chat Tab**: Implemented automatic chat tab creation and message routing (`OneMiniMapDB.routeToOneAddonTab`, default `true`).
+  - Scans `1` to `NUM_CHAT_WINDOWS` on load for a tab named `"OneAddon"`.
+  - Automatically creates and docks it via `FCF_OpenNewWindow` and `FCF_DockFrame` if not present.
+  - Clears standard public channels (`ChatFrame_RemoveAllMessageGroups`, `ChatFrame_RemoveAllChannels`) to maintain a clean console.
+  - Replaces all direct `DEFAULT_CHAT_FRAME:AddMessage` calls with `OneMiniMap:Print(...)`, routing startup notices, settings changes, and command feedback to the dedicated tab.
+  - Added Options UI toggle and `/omm chat` slash command with automatic fallback to General Chat if disabled or if the tab is closed.
 
 ### Spin 0.5.0
 - **Permanent Top-Anchored Button Collector**: 3-dot grip header (`•••`) is permanently fixed at the top of the collector panel, buttons always order from top to bottom (button 1 below header), and the panel strictly grows downward.

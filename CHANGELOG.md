@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.1] - 2026-11-06
+### Added
+- **Dedicated "OneAddon" Chat Tab**: Added automatic chat tab creation and message routing (`OneMiniMapDB.routeToOneAddonTab`, defaults to `true`).
+  - At load, checks all chat windows for a tab named `"OneAddon"`. If missing, creates and docks one to the main chat frame and clears noisy game channels (General, Trade, monster spam).
+  - Routes all initialization, configuration feedback, and slash command output to this clean tab so General Chat is never spammed.
+  - Gracefully falls back to General Chat (`DEFAULT_CHAT_FRAME`) if the tab is closed or if the user disables routing.
+- **Options UI Checkbox**: Added "Route Addon Messages to 'OneAddon' Chat Tab" setting in the `/omm` options window.
+- **Slash Commands**: Added `/omm chat` (or `/omm tab`) to quickly toggle message routing between the `"OneAddon"` tab and General Chat.
+
 ## [0.5.0] - 2026-11-06
 ### Added
 - **Horizontal Column Growth Option**: Added "Grow Columns to the Left (Unchecked: Grow Right)" setting (`OneMiniMapDB.growLeft`, defaults to `true`).

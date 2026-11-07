@@ -62,6 +62,7 @@ Then start or reload World of Warcraft (`/reload`).
 | `/omm coords` | Toggle the coordinates frame on or off |
 | `/omm buttons` | Toggle the button collector tray on or off |
 | `/omm grow` or `/omm growleft` | Toggle Button Collector column growth (Left vs Right) |
+| `/omm chat` or `/omm tab` | Toggle routing addon messages to 'OneAddon' chat tab |
 | `/omm scale <0.5 - 2.0>` | Adjust overall minimap scale |
 | `/omm dump` | Print diagnostic frame inspector details |
 | `/omm reset` | Reset all frames and positions to default layout |

@@ -13,7 +13,7 @@ _G.OneMiniMap = _G.OneMiniMap or addonTable
 local OneMiniMap = _G.OneMiniMap
 
 OneMiniMap.name = addonName or "OneMiniMap"
-OneMiniMap.version = "0.5.0"
+OneMiniMap.version = "0.5.1"
 OneMiniMap.isInitialized = false
 
 -- Default Database Configuration
@@ -27,6 +27,7 @@ local defaultDB = {
     showButtons = true,
     buttonCols = 1,
     growLeft = true,
+    routeToOneAddonTab = true,
     scale = 1.0,
     mapPosition = nil,
     titlePosition = nil,
@@ -575,7 +576,7 @@ function OneMiniMap:CreateClockFrame()
             local newMode = not OneMiniMapDB.useServerTime
             OneMiniMap:SetServerTime(newMode)
             local modeStr = newMode and "Server Time" or "Local Time"
-            DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Clock set to " .. modeStr .. ".")
+            OneMiniMap:Print("|cff00ccffOneMiniMap|r: Clock set to " .. modeStr .. ".")
         else
             if IsShiftKeyDown and IsShiftKeyDown() and ToggleTimeManager then
                 ToggleTimeManager()
@@ -583,7 +584,7 @@ function OneMiniMap:CreateClockFrame()
                 local new24 = not OneMiniMapDB.use24h
                 OneMiniMap:Set24Hour(new24)
                 local modeStr = new24 and "24-hour" or "12-hour"
-                DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Clock set to " .. modeStr .. " mode.")
+                OneMiniMap:Print("|cff00ccffOneMiniMap|r: Clock set to " .. modeStr .. " mode.")
             end
         end
     end)
@@ -751,6 +752,58 @@ function OneMiniMap:SetGrowLeft(growLeft)
 end
 
 -------------------------------------------------------------------------------
+-- Message Routing & Dedicated Chat Tab ("OneAddon")
+-------------------------------------------------------------------------------
+function OneMiniMap:GetChatFrame()
+    if OneMiniMapDB and OneMiniMapDB.routeToOneAddonTab == false then
+        return DEFAULT_CHAT_FRAME
+    end
+
+    local targetName = "OneAddon"
+
+    -- 1. Check existing chat windows for "OneAddon" tab
+    for i = 1, (NUM_CHAT_WINDOWS or 10) do
+        local name = GetChatWindowInfo(i)
+        if name == targetName then
+            local cf = _G["ChatFrame" .. i]
+            if cf then return cf end
+        end
+    end
+
+    -- 2. Create and dock "OneAddon" tab if missing
+    if FCF_OpenNewWindow then
+        local frame = FCF_OpenNewWindow(targetName)
+        if frame then
+            if FCF_DockFrame then
+                local numDocked = (FCF_GetNumDockedFrames and FCF_GetNumDockedFrames()) or 1
+                pcall(FCF_DockFrame, frame, numDocked + 1)
+            end
+            if ChatFrame_RemoveAllMessageGroups then
+                pcall(ChatFrame_RemoveAllMessageGroups, frame)
+            end
+            if ChatFrame_RemoveAllChannels then
+                pcall(ChatFrame_RemoveAllChannels, frame)
+            end
+            return frame
+        end
+    end
+
+    return DEFAULT_CHAT_FRAME or ChatFrame1
+end
+
+function OneMiniMap:Print(msg, ...)
+    if ... then
+        msg = string.format(msg, ...)
+    end
+    local targetFrame = self:GetChatFrame()
+    if targetFrame and targetFrame.AddMessage then
+        targetFrame:AddMessage(msg)
+    elseif DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+        DEFAULT_CHAT_FRAME:AddMessage(msg)
+    end
+end
+
+-------------------------------------------------------------------------------
 -- Update Routines (Clock, Coordinates, Zone)
 -------------------------------------------------------------------------------
 function OneMiniMap:UpdateClock()
@@ -906,19 +959,19 @@ end
 -- Diagnostic Inspector (/omm dump)
 -------------------------------------------------------------------------------
 function OneMiniMap:DumpInspection()
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap Inspector Dump:|r")
+    self:Print("|cff00ccffOneMiniMap Inspector Dump:|r")
     local function PrintInfo(prefix, frame)
         if not frame then return end
-        DEFAULT_CHAT_FRAME:AddMessage(string.format("  [%s] Name: %s, Shown: %s", prefix, frame:GetName() or "Anon", tostring(frame:IsShown())))
+        OneMiniMap:Print(string.format("  [%s] Name: %s, Shown: %s", prefix, frame:GetName() or "Anon", tostring(frame:IsShown())))
         if frame.GetRegions then
             for i, r in ipairs({ frame:GetRegions() }) do
                 local tex = r.GetTexture and r:GetTexture()
-                DEFAULT_CHAT_FRAME:AddMessage(string.format("    Region %d (%s): Shown=%s, Tex=%s", i, r:GetObjectType() or "?", tostring(r:IsShown()), tostring(tex)))
+                OneMiniMap:Print(string.format("    Region %d (%s): Shown=%s, Tex=%s", i, r:GetObjectType() or "?", tostring(r:IsShown()), tostring(tex)))
             end
         end
         if frame.GetChildren then
             for i, c in ipairs({ frame:GetChildren() }) do
-                DEFAULT_CHAT_FRAME:AddMessage(string.format("    Child %d: Name=%s, Shown=%s", i, c:GetName() or "Anon", tostring(c:IsShown())))
+                OneMiniMap:Print(string.format("    Child %d: Name=%s, Shown=%s", i, c:GetName() or "Anon", tostring(c:IsShown())))
             end
         end
     end
@@ -989,7 +1042,7 @@ function OneMiniMap:Initialize()
     StartUpdateTicker()
 
     self.isInitialized = true
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r v" .. self.version .. " initialized. Type |cffffd200/omm|r for options.")
+    self:Print("|cff00ccffOneMiniMap|r v" .. self.version .. " initialized. Type |cffffd200/omm|r for options.")
 end
 
 -------------------------------------------------------------------------------
@@ -1007,53 +1060,57 @@ SlashCmdList["ONEMINIMAP"] = function(msg)
         if OneMiniMap.ToggleOptions then
             OneMiniMap:ToggleOptions()
         else
-            DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Type |cffffd200/omm help|r for command list.")
+            OneMiniMap:Print("|cff00ccffOneMiniMap|r: Type |cffffd200/omm help|r for command list.")
         end
     elseif cmd == "lock" then
         OneMiniMapDB.locked = true
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Frames are now |cffff2020LOCKED|r.")
+        OneMiniMap:Print("|cff00ccffOneMiniMap|r: Frames are now |cffff2020LOCKED|r.")
     elseif cmd == "unlock" then
         OneMiniMapDB.locked = false
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Frames are now |cff20ff20UNLOCKED|r. You can click & drag anywhere on the Map, Title, Clock, Coords, or Button Bar to move them.")
+        OneMiniMap:Print("|cff00ccffOneMiniMap|r: Frames are now |cff20ff20UNLOCKED|r. You can click & drag anywhere on the Map, Title, Clock, Coords, or Button Bar to move them.")
     elseif cmd == "coords" then
         OneMiniMapDB.showCoords = not OneMiniMapDB.showCoords
         if OneMiniMap.coordFrame then
             OneMiniMap.coordFrame:SetShown(OneMiniMapDB.showCoords)
         end
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Coordinates frame toggled " .. (OneMiniMapDB.showCoords and "|cff20ff20ON|r" or "|cffff2020OFF|r") .. ".")
+        OneMiniMap:Print("|cff00ccffOneMiniMap|r: Coordinates frame toggled " .. (OneMiniMapDB.showCoords and "|cff20ff20ON|r" or "|cffff2020OFF|r") .. ".")
     elseif cmd == "clock" then
         OneMiniMapDB.showClock = not OneMiniMapDB.showClock
         if OneMiniMap.clockFrame then
             OneMiniMap.clockFrame:SetShown(OneMiniMapDB.showClock)
         end
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Clock frame toggled " .. (OneMiniMapDB.showClock and "|cff20ff20ON|r" or "|cffff2020OFF|r") .. ".")
+        OneMiniMap:Print("|cff00ccffOneMiniMap|r: Clock frame toggled " .. (OneMiniMapDB.showClock and "|cff20ff20ON|r" or "|cffff2020OFF|r") .. ".")
     elseif cmd == "time" or cmd == "servertime" or cmd == "localtime" then
         local newMode = not OneMiniMapDB.useServerTime
         OneMiniMap:SetServerTime(newMode)
         local modeStr = newMode and "Server Time" or "Local Time"
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Clock set to " .. modeStr .. ".")
+        OneMiniMap:Print("|cff00ccffOneMiniMap|r: Clock set to " .. modeStr .. ".")
     elseif cmd == "title" then
         OneMiniMapDB.showTitle = not OneMiniMapDB.showTitle
         if OneMiniMap.titleFrame then
             OneMiniMap.titleFrame:SetShown(OneMiniMapDB.showTitle)
         end
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Title bar toggled " .. (OneMiniMapDB.showTitle and "|cff20ff20ON|r" or "|cffff2020OFF|r") .. ".")
+        OneMiniMap:Print("|cff00ccffOneMiniMap|r: Title bar toggled " .. (OneMiniMapDB.showTitle and "|cff20ff20ON|r" or "|cffff2020OFF|r") .. ".")
     elseif cmd == "buttons" or cmd == "bar" then
         if OneMiniMap.ButtonCollector and OneMiniMap.ButtonCollector.frame then
             local isShown = OneMiniMap.ButtonCollector.frame:IsShown()
             OneMiniMap.ButtonCollector.frame:SetShown(not isShown)
-            DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Button Collector toggled " .. (not isShown and "|cff20ff20ON|r" or "|cffff2020OFF|r") .. ".")
+            OneMiniMap:Print("|cff00ccffOneMiniMap|r: Button Collector toggled " .. (not isShown and "|cff20ff20ON|r" or "|cffff2020OFF|r") .. ".")
         end
     elseif cmd == "growleft" or cmd == "grow" or cmd == "columngrow" then
         local newGrow = not (OneMiniMapDB and (OneMiniMapDB.growLeft ~= false))
         OneMiniMap:SetGrowLeft(newGrow)
         local dirStr = newGrow and "Grow to the Left" or "Grow to the Right"
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Button Collector column growth set to " .. dirStr .. ".")
+        OneMiniMap:Print("|cff00ccffOneMiniMap|r: Button Collector column growth set to " .. dirStr .. ".")
+    elseif cmd == "chat" or cmd == "tab" then
+        OneMiniMapDB.routeToOneAddonTab = not (OneMiniMapDB.routeToOneAddonTab ~= false)
+        local dest = OneMiniMapDB.routeToOneAddonTab and "'OneAddon' chat tab" or "General chat"
+        OneMiniMap:Print("|cff00ccffOneMiniMap|r: Addon messages routed to " .. dest .. ".")
     elseif cmd == "page1" or cmd == "resetbars" then
         if ChangeActionBarPage then
             ChangeActionBarPage(1)
         end
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Action bar reset to Page 1.")
+        OneMiniMap:Print("|cff00ccffOneMiniMap|r: Action bar reset to Page 1.")
     elseif cmd == "dump" then
         OneMiniMap:DumpInspection()
     elseif cmd == "reset" then
@@ -1070,14 +1127,14 @@ SlashCmdList["ONEMINIMAP"] = function(msg)
         if OneMiniMap.OptionsUI and OneMiniMap.OptionsUI.RestorePosition then
             OneMiniMap.OptionsUI:RestorePosition()
         end
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: All positions reset to defaults.")
+        OneMiniMap:Print("|cff00ccffOneMiniMap|r: All positions reset to defaults.")
     elseif cmd == "scale" and tonumber(arg) then
         local s = tonumber(arg)
         if s and s >= 0.5 and s <= 2.0 then
             OneMiniMap:SetScale(s)
-            DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Scale set to " .. string.format("%.0f%%", s * 100) .. ".")
+            OneMiniMap:Print("|cff00ccffOneMiniMap|r: Scale set to " .. string.format("%.0f%%", s * 100) .. ".")
         else
-            DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Scale must be between 0.5 and 2.0.")
+            OneMiniMap:Print("|cff00ccffOneMiniMap|r: Scale must be between 0.5 and 2.0.")
         end
     elseif cmd == "test" or cmd == "testbuttons" then
         OneMiniMapDB.testMode = not OneMiniMapDB.testMode
@@ -1085,20 +1142,21 @@ SlashCmdList["ONEMINIMAP"] = function(msg)
             OneMiniMap.ButtonCollector:Update()
         end
         local st = OneMiniMapDB.testMode and "|cff20ff20ON (12 buttons, 2 columns)|r" or "|cffff2020OFF|r"
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Test mode " .. st .. ".")
+        OneMiniMap:Print("|cff00ccffOneMiniMap|r: Test mode " .. st .. ".")
     else
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r commands:")
-        DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm lock|r - Lock all frame positions")
-        DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm unlock|r - Unlock all frames for dragging")
-        DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm title|r - Toggle title bar frame")
-        DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm clock|r - Toggle clock frame")
-        DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm time|r - Toggle Local vs Server time")
-        DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm coords|r - Toggle coordinates frame")
-        DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm buttons|r - Toggle button collector frame")
-        DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm grow|r - Toggle Button Collector growth (Down vs Up)")
-        DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm page1|r - Reset action bar back to Page 1")
-        DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm dump|r - Print diagnostic frame inspector details")
-        DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm reset|r - Reset all frames to default positions")
+        OneMiniMap:Print("|cff00ccffOneMiniMap|r commands:")
+        OneMiniMap:Print("  |cffffd200/omm lock|r - Lock all frame positions")
+        OneMiniMap:Print("  |cffffd200/omm unlock|r - Unlock all frames for dragging")
+        OneMiniMap:Print("  |cffffd200/omm title|r - Toggle title bar frame")
+        OneMiniMap:Print("  |cffffd200/omm clock|r - Toggle clock frame")
+        OneMiniMap:Print("  |cffffd200/omm time|r - Toggle Local vs Server time")
+        OneMiniMap:Print("  |cffffd200/omm coords|r - Toggle coordinates frame")
+        OneMiniMap:Print("  |cffffd200/omm buttons|r - Toggle button collector frame")
+        OneMiniMap:Print("  |cffffd200/omm grow|r - Toggle Button Collector column growth (Left vs Right)")
+        OneMiniMap:Print("  |cffffd200/omm chat|r - Toggle routing addon messages to 'OneAddon' chat tab")
+        OneMiniMap:Print("  |cffffd200/omm page1|r - Reset action bar back to Page 1")
+        OneMiniMap:Print("  |cffffd200/omm dump|r - Print diagnostic frame inspector details")
+        OneMiniMap:Print("  |cffffd200/omm reset|r - Reset all frames to default positions")
     end
 end
 
