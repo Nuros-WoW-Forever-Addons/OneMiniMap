@@ -103,7 +103,7 @@ function OptionsUI:CreateStandaloneWindow()
     if standaloneWindow then return standaloneWindow end
 
     local frame = CreateFrame("Frame", "OneMiniMapOptionsFrame", UIParent, backdropTemplate)
-    frame:SetSize(360, 488)
+    frame:SetSize(360, 516)
     frame:SetFrameStrata("DIALOG")
     frame:SetToplevel(true)
     frame:SetClampedToScreen(true)
@@ -256,7 +256,7 @@ function OptionsUI:CreateStandaloneWindow()
     cbButtons:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, yOfs)
     yOfs = yOfs - spacing
 
-    -- 7. 2 Columns for Button Collector
+    -- 8. 2 Columns for Button Collector
     local cbCols = CreateCheckbox(frame, "Force 2 Columns (Auto-wraps at > 8 buttons)", 
         function() return OneMiniMapDB and (OneMiniMapDB.buttonCols == 2) end,
         function(val)
@@ -266,6 +266,26 @@ function OptionsUI:CreateStandaloneWindow()
             end
         end)
     cbCols:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, yOfs)
+    yOfs = yOfs - spacing
+
+    -- 9. Button Collector Growth Direction (Down vs Up)
+    local cbGrow = CreateCheckbox(frame, "Grow Buttons Upward (Unchecked: Grow Downward)", 
+        function() return OneMiniMapDB and OneMiniMapDB.buttonGrowUp end,
+        function(val)
+            if OneMiniMap.SetButtonGrowUp then
+                OneMiniMap:SetButtonGrowUp(val)
+            elseif OneMiniMap.ButtonCollector and OneMiniMap.ButtonCollector.SetGrowUp then
+                OneMiniMap.ButtonCollector:SetGrowUp(val)
+            else
+                OneMiniMapDB.buttonGrowUp = val
+                if OneMiniMap.ButtonCollector and OneMiniMap.ButtonCollector.Update then
+                    OneMiniMap.ButtonCollector:Update()
+                end
+            end
+            local dirStr = (OneMiniMapDB and OneMiniMapDB.buttonGrowUp) and "Grow Upward" or "Grow Downward"
+            DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Button Collector growth set to " .. dirStr .. ".")
+        end)
+    cbGrow:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, yOfs)
     yOfs = yOfs - 38
 
     -- 8. Minimap Scale Slider

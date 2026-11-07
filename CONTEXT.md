@@ -7,7 +7,7 @@
 ## 🎯 Overview & Scope
 
 - **Addon Name**: OneMiniMap
-- **Current Version**: 0.3.9
+- **Current Version**: 0.4.0
 - **Suite**: Part of the **OneSuite** family
 - **GitHub Repository**:
   - Exists: TRUE
@@ -17,7 +17,7 @@
 - **Live Sync Path**: `/Applications/World of Warcraft/_classic_beta_/Interface/AddOns/OneMiniMap/`
 - **Rollback Target**: Last working `main` branch commit
 - **Release Package**: `.github/workflows/package.yml` generates `OneMiniMap-latest.zip` on push to `main`
-- **Target WoW Runtimes**: WoW Forever Beta (v1.60.1 / Interface 16001), Vanilla 1.12 (`11200`), TBC 2.4.3 (`20400`), WotLK 3.3.5 (`30300`), Modern WoW (`110000+`)
+- **Target WoW Runtimes**: WoW Forever Beta (v1.60.1 / Interface 16001)
 - **Primary Goal**: Deliver a modern square minimap with signature OneSuite silver metal dialog aesthetics, clean independent title/clock/coordinate modules, button consolidation, and zero circular chrome remnants.
 
 ---
@@ -38,6 +38,8 @@ OneMiniMapDB = {
     showClock = true,                  -- Show independent clock frame
     useServerTime = false,             -- 24h / Local vs Server time
     showCoords = true,                 -- Show player coordinates frame
+    buttonCols = 1,                    -- Number of button collector columns
+    buttonGrowUp = false,              -- Button collector growth direction (false = down, true = up)
     scale = 1.0,                       -- Minimap scale (0.5 to 2.0)
     mapPosition = nil,                 -- Saved Minimap anchor table
     titlePosition = nil,               -- Saved Title bar anchor table
@@ -64,6 +66,18 @@ When picking up development on this addon:
 ---
 
 ## ✅ Recent Completed Work (Latest Spins)
+
+### Spin 0.4.0
+- Added Button Collector Growth Direction option (`OneMiniMapDB.buttonGrowUp`):
+  - **Grow Downward**: Header grip at top, buttons stack downward, frame anchored by TOP edge.
+  - **Grow Upward**: Header grip at bottom, buttons stack upward, frame anchored by BOTTOM edge.
+- Added "Grow Buttons Upward (Unchecked: Grow Downward)" checkbox to `/omm` Options UI.
+- Added `/omm grow` slash command to quickly toggle growth direction.
+- Dynamic anchor translation ensures the Button Collector bar does not jump across screen upon toggling.
+- Full 16-slot drag preview and button repositioning accurately previews upward/downward footprint.
+
+### Spin 0.3.9
+- Hardened Blizzard `Layout` and `MarkDirty` safety mocks across `hiddenFrame`, `MinimapCluster`, and mail button parents to eliminate `UPDATE_PENDING_MAIL` nil crashes.
 
 ### Spin 0.3.8
 - Initial square mask texture implementation with automatic `GetMinimapShape` override.

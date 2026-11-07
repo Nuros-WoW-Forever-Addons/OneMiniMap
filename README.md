@@ -25,7 +25,7 @@ Part of the **OneSuite** family of addons.
   - Displays live player coordinates (`XX.X, YY.X`) formatted in crisp gold text.
   - Throttled update rate (0.15s) with cross-client support (Vanilla 1.12, Turtle WoW 1.16, WotLK 3.3.5, and Modern WoW).
 - 🔍 **Mouse Wheel Zooming**: Scroll up to zoom in, scroll down to zoom out directly over the minimap.
-- 🗃️ **Integrated Button Collector**: Neatly docks tracking, mail, calendar/time, and queue icons along corners or into an organized collapsible tray without cluttering the screen.
+- 🗃️ **Integrated Button Collector**: Neatly docks tracking, mail, calendar/time, and queue icons along corners or into an organized collapsible tray without cluttering the screen. Supports configurable growth direction (Down vs Up) and multi-column auto-wrapping.
 - 🔒 **Full Drag & Lock Controls**: Drag frames when unlocked (or `Alt` + drag the minimap). Lock/unlock all frames with `/omm lock` and `/omm unlock`.
 
 ---
@@ -61,6 +61,7 @@ Then start or reload World of Warcraft (`/reload`).
 | `/omm time` | Toggle between Local Time and Server Time |
 | `/omm coords` | Toggle the coordinates frame on or off |
 | `/omm buttons` | Toggle the button collector tray on or off |
+| `/omm grow` | Toggle Button Collector growth direction (Down vs Up) |
 | `/omm scale <0.5 - 2.0>` | Adjust overall minimap scale |
 | `/omm dump` | Print diagnostic frame inspector details |
 | `/omm reset` | Reset all frames and positions to default layout |

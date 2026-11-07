@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.0] - 2026-11-06
+### Added
+- **Button Collector Growth Direction**: Added option to configure the Button Collector to grow Down vs Up (`OneMiniMapDB.buttonGrowUp`).
+  - **Grow Downward** (default): Header grip is at the top, buttons stack downward, and the frame anchors from the top edge.
+  - **Grow Upward**: Header grip is at the bottom, buttons stack upward, and the frame anchors from the bottom edge.
+- **Options UI Checkbox**: Added "Grow Buttons Upward (Unchecked: Grow Downward)" setting in the `/omm` configuration window.
+- **Slash Command**: Added `/omm grow` (aliases `/omm growth`, `/omm growdir`) to quickly toggle between Downward and Upward growth.
+- **Dynamic Anchor Conversion**: Smooth coordinate translation when toggling growth directions so the bar remains anchored stably without jumping.
+
 ## [0.3.9] - 2026-10-11
 ### Fixed
 - **Blizzard Layout Compatibility**: Added safe `.Layout` and `.MarkDirty` mock implementations to `hiddenFrame`, `MinimapCluster`, and `mailBtn:GetParent()`, preventing `attempt to call a nil value` exceptions from Blizzard's `MiniMapMailFrameMixin:OnEvent` during `UPDATE_PENDING_MAIL` events.

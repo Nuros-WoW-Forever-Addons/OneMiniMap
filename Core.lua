@@ -13,7 +13,7 @@ _G.OneMiniMap = _G.OneMiniMap or addonTable
 local OneMiniMap = _G.OneMiniMap
 
 OneMiniMap.name = addonName or "OneMiniMap"
-OneMiniMap.version = "0.3.9"
+OneMiniMap.version = "0.4.0"
 OneMiniMap.isInitialized = false
 
 -- Default Database Configuration
@@ -26,6 +26,7 @@ local defaultDB = {
     showCoords = true,
     showButtons = true,
     buttonCols = 1,
+    buttonGrowUp = false,
     scale = 1.0,
     mapPosition = nil,
     titlePosition = nil,
@@ -739,6 +740,16 @@ function OneMiniMap:Set24Hour(use24h)
     self:UpdateClock()
 end
 
+function OneMiniMap:SetButtonGrowUp(growUp)
+    OneMiniMapDB = OneMiniMapDB or {}
+    OneMiniMapDB.buttonGrowUp = growUp and true or false
+    if self.ButtonCollector and self.ButtonCollector.SetGrowUp then
+        self.ButtonCollector:SetGrowUp(OneMiniMapDB.buttonGrowUp)
+    elseif self.ButtonCollector and self.ButtonCollector.Update then
+        self.ButtonCollector:Update()
+    end
+end
+
 -------------------------------------------------------------------------------
 -- Update Routines (Clock, Coordinates, Zone)
 -------------------------------------------------------------------------------
@@ -1033,6 +1044,11 @@ SlashCmdList["ONEMINIMAP"] = function(msg)
             OneMiniMap.ButtonCollector.frame:SetShown(not isShown)
             DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Button Collector toggled " .. (not isShown and "|cff20ff20ON|r" or "|cffff2020OFF|r") .. ".")
         end
+    elseif cmd == "grow" or cmd == "growth" or cmd == "growdir" then
+        local newGrow = not (OneMiniMapDB and OneMiniMapDB.buttonGrowUp)
+        OneMiniMap:SetButtonGrowUp(newGrow)
+        local dirStr = newGrow and "Grow Upward" or "Grow Downward"
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Button Collector growth set to " .. dirStr .. ".")
     elseif cmd == "page1" or cmd == "resetbars" then
         if ChangeActionBarPage then
             ChangeActionBarPage(1)
@@ -1079,6 +1095,7 @@ SlashCmdList["ONEMINIMAP"] = function(msg)
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm time|r - Toggle Local vs Server time")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm coords|r - Toggle coordinates frame")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm buttons|r - Toggle button collector frame")
+        DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm grow|r - Toggle Button Collector growth (Down vs Up)")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm page1|r - Reset action bar back to Page 1")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm dump|r - Print diagnostic frame inspector details")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffd200/omm reset|r - Reset all frames to default positions")

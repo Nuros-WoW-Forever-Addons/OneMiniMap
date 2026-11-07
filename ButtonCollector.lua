@@ -162,12 +162,24 @@ function BC:ShowDragPreview()
     self.frame:SetSize(totalWidth, fullHeight)
 
     local growthDir = self:GetGrowthDirection()
+    local growUp = OneMiniMapDB and OneMiniMapDB.buttonGrowUp
+
+    -- Position header
+    if self.frame.dragHeader then
+        self.frame.dragHeader:ClearAllPoints()
+        if growUp then
+            self.frame.dragHeader:SetPoint("BOTTOMLEFT", self.frame, "BOTTOMLEFT", 1, 1)
+            self.frame.dragHeader:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -1, 1)
+        else
+            self.frame.dragHeader:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 1, -1)
+            self.frame.dragHeader:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", -1, -1)
+        end
+    end
 
     -- Re-position active real buttons to match the 2-column preview layout
     for i, btn in ipairs(self.buttons or {}) do
         local colIdx = math.floor((i - 1) / maxRows)
         local rowIdx = (i - 1) % maxRows
-        local yOfs = -headerHeight - padding - (rowIdx * (buttonSize + spacing))
         local xOfs
         if growthDir == "LEFT" then
             xOfs = totalWidth - padding - buttonSize - (colIdx * (buttonSize + spacing))
@@ -175,7 +187,13 @@ function BC:ShowDragPreview()
             xOfs = padding + (colIdx * (buttonSize + spacing))
         end
         btn:ClearAllPoints()
-        btn:SetPoint("TOPLEFT", self.frame, "TOPLEFT", xOfs, yOfs)
+        if growUp then
+            local yOfs = headerHeight + padding + (rowIdx * (buttonSize + spacing))
+            btn:SetPoint("BOTTOMLEFT", self.frame, "BOTTOMLEFT", xOfs, yOfs)
+        else
+            local yOfs = -headerHeight - padding - (rowIdx * (buttonSize + spacing))
+            btn:SetPoint("TOPLEFT", self.frame, "TOPLEFT", xOfs, yOfs)
+        end
     end
 
     -- Create & show ghost slots for all unoccupied slots up to 16
@@ -184,7 +202,6 @@ function BC:ShowDragPreview()
         local colIdx = math.floor((i - 1) / maxRows)
         local rowIdx = (i - 1) % maxRows
 
-        local yOfs = -headerHeight - padding - (rowIdx * (buttonSize + spacing))
         local xOfs
         if growthDir == "LEFT" then
             xOfs = totalWidth - padding - buttonSize - (colIdx * (buttonSize + spacing))
@@ -227,7 +244,13 @@ function BC:ShowDragPreview()
         end
 
         slot:ClearAllPoints()
-        slot:SetPoint("TOPLEFT", self.frame, "TOPLEFT", xOfs, yOfs)
+        if growUp then
+            local yOfs = headerHeight + padding + (rowIdx * (buttonSize + spacing))
+            slot:SetPoint("BOTTOMLEFT", self.frame, "BOTTOMLEFT", xOfs, yOfs)
+        else
+            local yOfs = -headerHeight - padding - (rowIdx * (buttonSize + spacing))
+            slot:SetPoint("TOPLEFT", self.frame, "TOPLEFT", xOfs, yOfs)
+        end
         if slot.text then
             slot.text:SetText(tostring(i))
         end
@@ -288,13 +311,51 @@ function BC:CreateFrame()
         frame:StopMovingOrSizing()
         BC:HideDragPreview()
         if OneMiniMapDB then
-            local point, _, relPoint, xOfs, yOfs = frame:GetPoint()
+            local growUp = OneMiniMapDB.buttonGrowUp
+            local growthDir = BC:GetGrowthDirection()
+            local point, relPoint, xOfs, yOfs
+            if growUp then
+                local b = frame:GetBottom() or 0
+                if growthDir == "LEFT" then
+                    local r = frame:GetRight() or 0
+                    local uRight = UIParent:GetRight() or 0
+                    point = "BOTTOMRIGHT"
+                    relPoint = "BOTTOMRIGHT"
+                    xOfs = r - uRight
+                    yOfs = b
+                else
+                    local l = frame:GetLeft() or 0
+                    point = "BOTTOMLEFT"
+                    relPoint = "BOTTOMLEFT"
+                    xOfs = l
+                    yOfs = b
+                end
+            else
+                local t = frame:GetTop() or 0
+                local uTop = UIParent:GetTop() or 0
+                if growthDir == "LEFT" then
+                    local r = frame:GetRight() or 0
+                    local uRight = UIParent:GetRight() or 0
+                    point = "TOPRIGHT"
+                    relPoint = "TOPRIGHT"
+                    xOfs = r - uRight
+                    yOfs = t - uTop
+                else
+                    local l = frame:GetLeft() or 0
+                    point = "TOPLEFT"
+                    relPoint = "TOPLEFT"
+                    xOfs = l
+                    yOfs = t - uTop
+                end
+            end
             OneMiniMapDB.buttonCollectorPosition = {
-                point = point or "TOPRIGHT",
-                relPoint = relPoint or "TOPRIGHT",
+                point = point,
+                relPoint = relPoint,
                 x = math.floor((xOfs or 0) + 0.5),
                 y = math.floor((yOfs or 0) + 0.5),
             }
+            frame:ClearAllPoints()
+            frame:SetPoint(point, UIParent, relPoint, OneMiniMapDB.buttonCollectorPosition.x, OneMiniMapDB.buttonCollectorPosition.y)
         end
     end
 
@@ -664,12 +725,24 @@ function BC:Update()
     self.frame:SetSize(totalWidth, totalHeight)
 
     local growthDir = self:GetGrowthDirection()
+    local growUp = OneMiniMapDB and OneMiniMapDB.buttonGrowUp
+
+    -- Position drag grip header (TOP when growing down, BOTTOM when growing up)
+    if self.frame.dragHeader then
+        self.frame.dragHeader:ClearAllPoints()
+        if growUp then
+            self.frame.dragHeader:SetPoint("BOTTOMLEFT", self.frame, "BOTTOMLEFT", 1, 1)
+            self.frame.dragHeader:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -1, 1)
+        else
+            self.frame.dragHeader:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 1, -1)
+            self.frame.dragHeader:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", -1, -1)
+        end
+    end
 
     for i, btn in ipairs(collected) do
         local colIdx = math.floor((i - 1) / maxRows)
         local rowIdx = (i - 1) % maxRows
 
-        local yOfs = -headerHeight - padding - (rowIdx * (buttonSize + spacing))
         local xOfs
         if growthDir == "LEFT" then
             xOfs = totalWidth - padding - buttonSize - (colIdx * (buttonSize + spacing))
@@ -679,7 +752,13 @@ function BC:Update()
 
         btn:SetParent(self.frame)
         btn:ClearAllPoints()
-        btn:SetPoint("TOPLEFT", self.frame, "TOPLEFT", xOfs, yOfs)
+        if growUp then
+            local yOfs = headerHeight + padding + (rowIdx * (buttonSize + spacing))
+            btn:SetPoint("BOTTOMLEFT", self.frame, "BOTTOMLEFT", xOfs, yOfs)
+        else
+            local yOfs = -headerHeight - padding - (rowIdx * (buttonSize + spacing))
+            btn:SetPoint("TOPLEFT", self.frame, "TOPLEFT", xOfs, yOfs)
+        end
         btn:SetSize(buttonSize, buttonSize)
         btn:SetScale(1.0)
         btn:SetAlpha(1.0)
@@ -712,18 +791,81 @@ end
 function BC:RestorePosition()
     if not self.frame then return end
 
+    local growUp = OneMiniMapDB and OneMiniMapDB.buttonGrowUp
+
     self.frame:ClearAllPoints()
     if OneMiniMapDB and OneMiniMapDB.buttonCollectorPosition then
         local pos = OneMiniMapDB.buttonCollectorPosition
-        self.frame:SetPoint(pos.point or "TOPRIGHT", UIParent, pos.relPoint or "TOPRIGHT", pos.x or -180, pos.y or -60)
+        local defPoint = growUp and "BOTTOMRIGHT" or "TOPRIGHT"
+        self.frame:SetPoint(pos.point or defPoint, UIParent, pos.relPoint or defPoint, pos.x or -180, pos.y or (growUp and 60 or -60))
     else
         -- Default: Docked flush to the left of the square minimap
         if OneMiniMap.mapFrame then
-            self.frame:SetPoint("TOPRIGHT", OneMiniMap.mapFrame, "TOPLEFT", -4, 0)
+            if growUp then
+                self.frame:SetPoint("BOTTOMRIGHT", OneMiniMap.mapFrame, "BOTTOMLEFT", -4, 0)
+            else
+                self.frame:SetPoint("TOPRIGHT", OneMiniMap.mapFrame, "TOPLEFT", -4, 0)
+            end
         else
-            self.frame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -180, -60)
+            if growUp then
+                self.frame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", -180, 60)
+            else
+                self.frame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -180, -60)
+            end
         end
     end
+end
+
+function BC:SetGrowUp(growUp)
+    OneMiniMapDB = OneMiniMapDB or {}
+    growUp = growUp and true or false
+    local oldGrowUp = OneMiniMapDB.buttonGrowUp and true or false
+
+    -- Smoothly convert saved position if frame is currently placed
+    if self.frame and self.frame:GetLeft() and OneMiniMapDB.buttonCollectorPosition then
+        local pos = OneMiniMapDB.buttonCollectorPosition
+        local growthDir = self:GetGrowthDirection()
+        if growUp and not oldGrowUp then
+            -- Transition from TOP anchor to BOTTOM anchor
+            local b = self.frame:GetBottom() or 0
+            if growthDir == "LEFT" then
+                local r = self.frame:GetRight() or 0
+                local uRight = UIParent:GetRight() or 0
+                pos.point = "BOTTOMRIGHT"
+                pos.relPoint = "BOTTOMRIGHT"
+                pos.x = math.floor((r - uRight) + 0.5)
+                pos.y = math.floor(b + 0.5)
+            else
+                local l = self.frame:GetLeft() or 0
+                pos.point = "BOTTOMLEFT"
+                pos.relPoint = "BOTTOMLEFT"
+                pos.x = math.floor(l + 0.5)
+                pos.y = math.floor(b + 0.5)
+            end
+        elseif not growUp and oldGrowUp then
+            -- Transition from BOTTOM anchor to TOP anchor
+            local t = self.frame:GetTop() or 0
+            local uTop = UIParent:GetTop() or 0
+            if growthDir == "LEFT" then
+                local r = self.frame:GetRight() or 0
+                local uRight = UIParent:GetRight() or 0
+                pos.point = "TOPRIGHT"
+                pos.relPoint = "TOPRIGHT"
+                pos.x = math.floor((r - uRight) + 0.5)
+                pos.y = math.floor((t - uTop) + 0.5)
+            else
+                local l = self.frame:GetLeft() or 0
+                pos.point = "TOPLEFT"
+                pos.relPoint = "TOPLEFT"
+                pos.x = math.floor(l + 0.5)
+                pos.y = math.floor((t - uTop) + 0.5)
+            end
+        end
+    end
+
+    OneMiniMapDB.buttonGrowUp = growUp
+    self:RestorePosition()
+    self:Update()
 end
 
 -------------------------------------------------------------------------------
