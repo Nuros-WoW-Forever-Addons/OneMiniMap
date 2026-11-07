@@ -14,7 +14,7 @@
   - URL: https://github.com/Nuros-WoW-Forever-Addons/OneMiniMap
   *(For any new addon, initialize with Exists: FALSE until first commit/push)*
 - **Branching Policy**: All new features must be developed on a branch != `main` (e.g. `feature/<name>`)
-- **Live Sync Path**: `/Applications/World of Warcraft/_classic_beta_/Interface/AddOns/OneMiniMap/`
+- **Live Sync Path**: `/Applications/World of Warcraft/_forever_/Interface/AddOns/OneMiniMap/`
 - **Rollback Target**: Last working `main` branch commit
 - **Release Package**: `.github/workflows/package.yml` generates `OneMiniMap-latest.zip` on push to `main`
 - **Target WoW Runtimes**: WoW Forever Beta (v1.60.1 / Interface 16001)
