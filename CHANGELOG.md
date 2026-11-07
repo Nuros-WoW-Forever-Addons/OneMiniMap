@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.0] - 2026-11-06
+### Added
+- **Horizontal Column Growth Option**: Added "Grow Columns to the Left (Unchecked: Grow Right)" setting (`OneMiniMapDB.growLeft`, defaults to `true`).
+  - **Grow Left** (default): Primary column 1 (buttons 1–8) stays on the right edge, while column 2 (buttons 9–16) expands to the left. Ideal when docked to the left of the minimap.
+  - **Grow Right**: Primary column 1 (buttons 1–8) stays on the left edge, while column 2 (buttons 9–16) expands to the right.
+- **Slash Commands**: Added `/omm growleft` (aliases `/omm grow`, `/omm columngrow`) to toggle horizontal column growth.
+
+### Changed & Fixed
+- **Permanent Top-Anchoring**: The 3-dot grip header (`•••`) is now fixed permanently at the top of the button collector panel. Buttons always stack from top to bottom (button 1 below the header, then button 2, etc.), and the panel always grows downward.
+- **Fixed Drag Repositioning & Size Jump Bug**: Fixed an issue where releasing the drag handle or clicking to move caused the top of the panel to jump or drop due to Blizzard's internal `BOTTOMLEFT` drag coordinates. The frame now captures `GetTop()` and its horizontal anchor immediately before closing the drag preview and explicitly anchors to `TOPRIGHT` or `TOPLEFT`, ensuring the 3-dot bar stays exactly where placed and preview expansion only extends downward.
+- **Cleaned Up Deprecated Settings**: Replaced `buttonGrowUp` with `growLeft` and automatically purged legacy bottom-anchored coordinates so the collector defaults flush to the top edge of the minimap.
+
 ## [0.4.0] - 2026-11-06
 ### Added
 - **Button Collector Growth Direction**: Added option to configure the Button Collector to grow Down vs Up (`OneMiniMapDB.buttonGrowUp`).

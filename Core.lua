@@ -13,7 +13,7 @@ _G.OneMiniMap = _G.OneMiniMap or addonTable
 local OneMiniMap = _G.OneMiniMap
 
 OneMiniMap.name = addonName or "OneMiniMap"
-OneMiniMap.version = "0.4.0"
+OneMiniMap.version = "0.5.0"
 OneMiniMap.isInitialized = false
 
 -- Default Database Configuration
@@ -26,7 +26,7 @@ local defaultDB = {
     showCoords = true,
     showButtons = true,
     buttonCols = 1,
-    buttonGrowUp = false,
+    growLeft = true,
     scale = 1.0,
     mapPosition = nil,
     titlePosition = nil,
@@ -740,11 +740,11 @@ function OneMiniMap:Set24Hour(use24h)
     self:UpdateClock()
 end
 
-function OneMiniMap:SetButtonGrowUp(growUp)
+function OneMiniMap:SetGrowLeft(growLeft)
     OneMiniMapDB = OneMiniMapDB or {}
-    OneMiniMapDB.buttonGrowUp = growUp and true or false
-    if self.ButtonCollector and self.ButtonCollector.SetGrowUp then
-        self.ButtonCollector:SetGrowUp(OneMiniMapDB.buttonGrowUp)
+    OneMiniMapDB.growLeft = (growLeft ~= false)
+    if self.ButtonCollector and self.ButtonCollector.SetGrowLeft then
+        self.ButtonCollector:SetGrowLeft(OneMiniMapDB.growLeft)
     elseif self.ButtonCollector and self.ButtonCollector.Update then
         self.ButtonCollector:Update()
     end
@@ -1044,11 +1044,11 @@ SlashCmdList["ONEMINIMAP"] = function(msg)
             OneMiniMap.ButtonCollector.frame:SetShown(not isShown)
             DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Button Collector toggled " .. (not isShown and "|cff20ff20ON|r" or "|cffff2020OFF|r") .. ".")
         end
-    elseif cmd == "grow" or cmd == "growth" or cmd == "growdir" then
-        local newGrow = not (OneMiniMapDB and OneMiniMapDB.buttonGrowUp)
-        OneMiniMap:SetButtonGrowUp(newGrow)
-        local dirStr = newGrow and "Grow Upward" or "Grow Downward"
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Button Collector growth set to " .. dirStr .. ".")
+    elseif cmd == "growleft" or cmd == "grow" or cmd == "columngrow" then
+        local newGrow = not (OneMiniMapDB and (OneMiniMapDB.growLeft ~= false))
+        OneMiniMap:SetGrowLeft(newGrow)
+        local dirStr = newGrow and "Grow to the Left" or "Grow to the Right"
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Button Collector column growth set to " .. dirStr .. ".")
     elseif cmd == "page1" or cmd == "resetbars" then
         if ChangeActionBarPage then
             ChangeActionBarPage(1)

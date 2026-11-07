@@ -7,7 +7,7 @@
 ## 🎯 Overview & Scope
 
 - **Addon Name**: OneMiniMap
-- **Current Version**: 0.4.0
+- **Current Version**: 0.5.0
 - **Suite**: Part of the **OneSuite** family
 - **GitHub Repository**:
   - Exists: TRUE
@@ -39,7 +39,7 @@ OneMiniMapDB = {
     useServerTime = false,             -- 24h / Local vs Server time
     showCoords = true,                 -- Show player coordinates frame
     buttonCols = 1,                    -- Number of button collector columns
-    buttonGrowUp = false,              -- Button collector growth direction (false = down, true = up)
+    growLeft = true,                   -- Second column growth direction (true = left, false = right)
     scale = 1.0,                       -- Minimap scale (0.5 to 2.0)
     mapPosition = nil,                 -- Saved Minimap anchor table
     titlePosition = nil,               -- Saved Title bar anchor table
@@ -66,6 +66,14 @@ When picking up development on this addon:
 ---
 
 ## ✅ Recent Completed Work (Latest Spins)
+
+### Spin 0.5.0
+- **Permanent Top-Anchored Button Collector**: 3-dot grip header (`•••`) is permanently fixed at the top of the collector panel, buttons always order from top to bottom (button 1 below header), and the panel strictly grows downward.
+- **Horizontal Column Growth Option**: Added `OneMiniMapDB.growLeft` (default `true`) allowing the second column (buttons > 8) to grow to the Left or Right:
+  - **Grow Left**: Column 1 stays fixed at right edge; column 2 expands to the left (ideal when docked to the left of the minimap).
+  - **Grow Right**: Column 1 stays fixed at left edge; column 2 expands to the right.
+- **Fixed Drag Preview & Sizing Jump Bug**: Fixed drag anchor calculation by immediately saving `TOPRIGHT` or `TOPLEFT` coordinates before hiding preview / resizing, preventing Blizzard's `BOTTOMLEFT` drag coordinates from causing the top of the panel to jump or drop.
+- **Options UI & Slash Commands**: Added "Grow Columns to the Left (Unchecked: Grow Right)" toggle in Options UI and `/omm growleft` (or `/omm columngrow`, `/omm grow`).
 
 ### Spin 0.4.0
 - Added Button Collector Growth Direction option (`OneMiniMapDB.buttonGrowUp`):

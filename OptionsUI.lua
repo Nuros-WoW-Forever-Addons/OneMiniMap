@@ -268,22 +268,22 @@ function OptionsUI:CreateStandaloneWindow()
     cbCols:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, yOfs)
     yOfs = yOfs - spacing
 
-    -- 9. Button Collector Growth Direction (Down vs Up)
-    local cbGrow = CreateCheckbox(frame, "Grow Buttons Upward (Unchecked: Grow Downward)", 
-        function() return OneMiniMapDB and OneMiniMapDB.buttonGrowUp end,
+    -- 9. Button Collector Column Growth Direction (Left vs Right)
+    local cbGrow = CreateCheckbox(frame, "Grow Columns to the Left (Unchecked: Grow Right)", 
+        function() return OneMiniMapDB and (OneMiniMapDB.growLeft ~= false) end,
         function(val)
-            if OneMiniMap.SetButtonGrowUp then
-                OneMiniMap:SetButtonGrowUp(val)
-            elseif OneMiniMap.ButtonCollector and OneMiniMap.ButtonCollector.SetGrowUp then
-                OneMiniMap.ButtonCollector:SetGrowUp(val)
+            if OneMiniMap.SetGrowLeft then
+                OneMiniMap:SetGrowLeft(val)
+            elseif OneMiniMap.ButtonCollector and OneMiniMap.ButtonCollector.SetGrowLeft then
+                OneMiniMap.ButtonCollector:SetGrowLeft(val)
             else
-                OneMiniMapDB.buttonGrowUp = val
+                OneMiniMapDB.growLeft = val
                 if OneMiniMap.ButtonCollector and OneMiniMap.ButtonCollector.Update then
                     OneMiniMap.ButtonCollector:Update()
                 end
             end
-            local dirStr = (OneMiniMapDB and OneMiniMapDB.buttonGrowUp) and "Grow Upward" or "Grow Downward"
-            DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Button Collector growth set to " .. dirStr .. ".")
+            local dirStr = val and "Grow to the Left" or "Grow to the Right"
+            DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffOneMiniMap|r: Button Collector column growth set to " .. dirStr .. ".")
         end)
     cbGrow:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, yOfs)
     yOfs = yOfs - 38
