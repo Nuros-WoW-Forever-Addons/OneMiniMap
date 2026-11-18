@@ -513,6 +513,81 @@ local function SkinCalendar(btn)
     end
 end
 
+local function SkinMail(btn)
+    if not btn then return end
+
+    -- Hide Blizzard circular border and stray glow/shine textures
+    local border = _G["MiniMapMailBorder"] or (btn.Border)
+    if border and border.Hide then
+        border:Hide()
+        if border.SetAlpha then border:SetAlpha(0) end
+    end
+
+    -- Size and center all mail icon texture regions cleanly inside 26x26 button
+    if btn.GetRegions then
+        for _, r in ipairs({ btn:GetRegions() }) do
+            if r:IsObjectType("Texture") then
+                local t = tostring(r:GetTexture() or ""):lower()
+                if t:find("border") or t:find("glow") or t:find("shine") or t:find("halo") or r == border then
+                    r:Hide()
+                    if r.SetAlpha then r:SetAlpha(0) end
+                elseif t ~= "" or (r.GetAtlas and r:GetAtlas()) then
+                    r:Show()
+                    r:SetAlpha(1.0)
+                    r:ClearAllPoints()
+                    r:SetSize(20, 20)
+                    r:SetPoint("CENTER", btn, "CENTER", 0, 0)
+                    local atlas = r.GetAtlas and r:GetAtlas()
+                    if not atlas and r.SetTexCoord then
+                        r:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+                    end
+                end
+            end
+        end
+    end
+
+    -- Also check child frames if present
+    if btn.GetChildren then
+        for _, child in ipairs({ btn:GetChildren() }) do
+            if child and child.GetRegions then
+                for _, r in ipairs({ child:GetRegions() }) do
+                    if r:IsObjectType("Texture") then
+                        local t = tostring(r:GetTexture() or ""):lower()
+                        if t:find("border") or t:find("glow") or t:find("shine") or t:find("halo") then
+                            r:Hide()
+                            if r.SetAlpha then r:SetAlpha(0) end
+                        elseif t ~= "" or (r.GetAtlas and r:GetAtlas()) then
+                            r:Show()
+                            r:SetAlpha(1.0)
+                            r:ClearAllPoints()
+                            r:SetSize(20, 20)
+                            r:SetPoint("CENTER", btn, "CENTER", 0, 0)
+                            local atlas = r.GetAtlas and r:GetAtlas()
+                            if not atlas and r.SetTexCoord then
+                                r:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- Explicitly verify MiniMapMailIcon if it exists globally or directly on btn
+    local mailIcon = _G["MiniMapMailIcon"] or (btn.MailIcon) or (btn.Icon) or (btn.icon)
+    if mailIcon and mailIcon.ClearAllPoints then
+        mailIcon:Show()
+        mailIcon:SetAlpha(1.0)
+        mailIcon:ClearAllPoints()
+        mailIcon:SetSize(20, 20)
+        mailIcon:SetPoint("CENTER", btn, "CENTER", 0, 0)
+        local atlas = mailIcon.GetAtlas and mailIcon:GetAtlas()
+        if not atlas and mailIcon.SetTexCoord then
+            mailIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        end
+    end
+end
+
 local function CleanCircularOverlays(btn)
     if not btn or not btn.GetRegions then return end
     for _, r in ipairs({ btn:GetRegions() }) do
@@ -582,6 +657,12 @@ function BC:Update()
         end
         if p and not p.MarkDirty then
             p.MarkDirty = function() end
+        end
+        if not mailBtn._oneMiniMapHooked and mailBtn.HookScript then
+            mailBtn._oneMiniMapHooked = true
+            mailBtn:HookScript("OnShow", function(self)
+                SkinMail(self)
+            end)
         end
     end
     local hasMail = (HasNewMail and HasNewMail()) or (mailBtn and mailBtn:IsShown())
@@ -729,12 +810,14 @@ function BC:Update()
         btn:Show()
 
         -- Normalize icon size for third-party / LibDBIcon buttons
-        if btn.icon and btn ~= optBtn then
-            btn.icon:ClearAllPoints()
-            btn.icon:SetSize(iconSize, iconSize)
-            btn.icon:SetPoint("CENTER", btn, "CENTER", 0, 0)
-            if btn.icon.SetTexCoord then
-                btn.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        local btnIcon = btn.icon or btn.Icon or (btn.GetName and _G[btn:GetName() .. "Icon"])
+        if btnIcon and btn ~= optBtn then
+            btnIcon:ClearAllPoints()
+            btnIcon:SetSize(iconSize, iconSize)
+            btnIcon:SetPoint("CENTER", btn, "CENTER", 0, 0)
+            local atlas = btnIcon.GetAtlas and btnIcon:GetAtlas()
+            if not atlas and btnIcon.SetTexCoord then
+                btnIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
             end
         end
 
@@ -743,6 +826,8 @@ function BC:Update()
             SkinTracking(btn)
         elseif btn == _G["GameTimeFrame"] then
             SkinCalendar(btn)
+        elseif btn == mailBtn or (btn:GetName() and btn:GetName():lower():find("mail")) then
+            SkinMail(btn)
         elseif btn ~= optBtn then
             CleanCircularOverlays(btn)
         end

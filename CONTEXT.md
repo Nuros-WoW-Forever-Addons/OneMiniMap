@@ -7,7 +7,7 @@
 ## 🎯 Overview & Scope
 
 - **Addon Name**: OneMiniMap
-- **Current Version**: 0.5.2
+- **Current Version**: 0.5.3
 - **Suite**: Part of the **OneSuite** family
 - **GitHub Repository**:
   - Exists: TRUE
@@ -67,6 +67,14 @@ When picking up development on this addon:
 ---
 
 ## ✅ Recent Completed Work (Latest Spins)
+
+### Spin 0.5.3
+- **Mail Icon Sizing & Skinning Alignment**: Implemented dedicated `SkinMail` helper for `MiniMapMailFrame` / `MinimapCluster.IndicatorFrame.MailFrame`:
+  - Strips Blizzard circular border and glow/shine artifacts.
+  - Recursively centers and resizes `MiniMapMailIcon` (and any related regions) to 20x20 at `CENTER, 0, 0` with `(0.08, 0.92, 0.08, 0.92)` texture coordinates.
+  - Eliminates right-side overhang, ensuring consistent 3px padding on all sides matching tracking, calendar, and addon buttons.
+- **Mail OnShow Re-skin Hook**: Added safe `OnShow` hook to re-apply `SkinMail` whenever the mail button appears or changes state.
+- **Universal Icon Normalization**: Extended icon detection in `ButtonCollector` to recognize `btn.icon`, `btn.Icon`, and `_G[btn:GetName() .. "Icon"]`.
 
 ### Spin 0.5.2
 - **Chat Tab Lifecycle & Docking Fix**: Deferred `"OneAddon"` chat tab creation to `PLAYER_ENTERING_WORLD` with a 0.3s timer, ensuring Blizzard's `FCF_UpdateChatWindows()` has completed loading chat caches from disk.

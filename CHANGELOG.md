@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.3] - 2026-11-17
+### Fixed
+- **Mail Icon Sizing & Padding Alignment**: Fixed an issue where the pending mail icon (`MiniMapMailFrame`) was slightly too large and overhung the right edge of its button frame. Added dedicated `SkinMail` processor that strips circular borders, centers `MiniMapMailIcon` at `CENTER, 0, 0`, constrains its size to `20x20` inside the `26x26` button frame, and crops edge bleed with `(0.08, 0.92, 0.08, 0.92)` coordinates, matching the exact 3px uniform padding of tracking, calendar, and addon buttons.
+- **Mail OnShow Re-skinning Hook**: Added a safe `OnShow` script hook on the mail frame to ensure skinning and centering are re-applied if Blizzard refreshes the mail indicator.
+- **Universal Icon Normalization**: Generalized icon detection in the Button Collector layout loop to normalize icons accessed via `btn.icon`, `btn.Icon`, or `_G[btn:GetName() .. "Icon"]`.
+
 ## [0.5.2] - 2026-11-06
 ### Fixed
 - **Chat Tab Initialization Timing**: Fixed an issue where `"OneAddon"` chat tab creation ran during `ADDON_LOADED` before `GENERAL_CHAT_DOCK` and chat cache were ready, causing Blizzard's chat loader to wipe it. Tab creation now defers to `PLAYER_ENTERING_WORLD` (with a 0.3s settling timer).
