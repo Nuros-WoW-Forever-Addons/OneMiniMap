@@ -7,7 +7,7 @@
 ## 🎯 Overview & Scope
 
 - **Addon Name**: OneMiniMap
-- **Current Version**: 0.5.3
+- **Current Version**: 0.5.4
 - **Suite**: Part of the **OneSuite** family
 - **GitHub Repository**:
   - Exists: TRUE
@@ -67,6 +67,9 @@ When picking up development on this addon:
 ---
 
 ## ✅ Recent Completed Work (Latest Spins)
+
+### Spin 0.5.4
+- **Fix Anonymous Button Nil Name Concatenation**: Resolved `ButtonCollector.lua:813: attempt to concatenate a nil value` by nil-guarding `(btn.GetName and btn:GetName())` before attempting global icon lookup `_G[btnName .. "Icon"]`. Safely handles anonymous buttons (like test mode buttons and third-party unnamed frames).
 
 ### Spin 0.5.3
 - **Mail Icon Sizing & Skinning Alignment**: Implemented dedicated `SkinMail` helper for `MiniMapMailFrame` / `MinimapCluster.IndicatorFrame.MailFrame`:

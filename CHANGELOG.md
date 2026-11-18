@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.4] - 2026-11-17
+### Fixed
+- **Anonymous Button Icon Nil Name Concatenation**: Fixed `attempt to concatenate a nil value` error on line 813 during `Update()` by validating that `btn:GetName()` is a non-empty string before querying `_G[btnName .. "Icon"]`, preventing errors when anonymous buttons (such as test buttons or unnamed third-party buttons) are laid out.
+
 ## [0.5.3] - 2026-11-17
 ### Fixed
 - **Mail Icon Sizing & Padding Alignment**: Fixed an issue where the pending mail icon (`MiniMapMailFrame`) was slightly too large and overhung the right edge of its button frame. Added dedicated `SkinMail` processor that strips circular borders, centers `MiniMapMailIcon` at `CENTER, 0, 0`, constrains its size to `20x20` inside the `26x26` button frame, and crops edge bleed with `(0.08, 0.92, 0.08, 0.92)` coordinates, matching the exact 3px uniform padding of tracking, calendar, and addon buttons.

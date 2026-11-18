@@ -810,7 +810,8 @@ function BC:Update()
         btn:Show()
 
         -- Normalize icon size for third-party / LibDBIcon buttons
-        local btnIcon = btn.icon or btn.Icon or (btn.GetName and _G[btn:GetName() .. "Icon"])
+        local btnName = (btn.GetName and btn:GetName()) or ""
+        local btnIcon = btn.icon or btn.Icon or (btnName ~= "" and _G[btnName .. "Icon"])
         if btnIcon and btn ~= optBtn then
             btnIcon:ClearAllPoints()
             btnIcon:SetSize(iconSize, iconSize)
@@ -822,11 +823,12 @@ function BC:Update()
         end
 
         -- Apply tailored skinning
+        local isMail = (btn == mailBtn) or (btnName ~= "" and btnName:lower():find("mail") ~= nil)
         if btn == trackingBtn then
             SkinTracking(btn)
         elseif btn == _G["GameTimeFrame"] then
             SkinCalendar(btn)
-        elseif btn == mailBtn or (btn:GetName() and btn:GetName():lower():find("mail")) then
+        elseif isMail then
             SkinMail(btn)
         elseif btn ~= optBtn then
             CleanCircularOverlays(btn)
